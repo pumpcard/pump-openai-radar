@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+"""Repo entry point: the scanner CLI plus `login`, `logout`, and `status`."""
+
+import runpy
+from pathlib import Path
+
+runpy.run_path(str(Path(__file__).resolve().with_name("cli_login_app.py")), run_name="__main__")

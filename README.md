@@ -198,14 +198,14 @@ uv pip install -e ".[all]"
 
 The package lives in `src/openai_radar`, including `cli.py` and `pump_login.py`.
 
-The repo launcher and `cli.py` are the same CLI:
+From this checkout:
 
 ```bash
 ./openai-radar --help
-python cli.py login
-python cli.py status
-python cli.py logout
-python cli.py version
+./openai-radar login
+./openai-radar status
+./openai-radar logout
+./openai-radar version
 ```
 
 `login` opens a browser for the Pump OAuth flow and writes the token to

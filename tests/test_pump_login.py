@@ -31,9 +31,7 @@ class _PumpHandler(BaseHTTPRequestHandler):
         state = "tampered" if self.server.tamper_state else self.server.seen_state
         target = urllib.parse.urlparse(self.server.redirect_uri)
         location = urllib.parse.urlunparse(
-            target._replace(
-                query=urllib.parse.urlencode({"code": "auth-code", "state": state})
-            )
+            target._replace(query=urllib.parse.urlencode({"code": "auth-code", "state": state}))
         )
         self.send_response(302)
         self.send_header("Location", location)
@@ -44,7 +42,9 @@ class _PumpHandler(BaseHTTPRequestHandler):
         body = urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8"))
         verifier = body["code_verifier"][0]
         if code_challenge_s256(verifier) != self.server.challenge:
-            self._json(400, {"error": "invalid_grant", "error_description": "PKCE verification failed."})
+            self._json(
+                400, {"error": "invalid_grant", "error_description": "PKCE verification failed."}
+            )
             return
         if body["redirect_uri"][0] != self.server.redirect_uri or body["code"][0] != "auth-code":
             self._json(400, {"error": "invalid_grant", "error_description": "redirect mismatch"})

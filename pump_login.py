@@ -98,7 +98,7 @@ def build_authorize_url(
 def _success_page() -> bytes:
     return (
         b"<!DOCTYPE html><html><head><meta charset='utf-8'><title>openai-radar</title></head>"
-        b"<body style=\"font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto;\">"
+        b'<body style="font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto;">'
         b"<h1>You are logged in</h1><p>Return to the terminal. You can close this window.</p>"
         b"</body></html>"
     )
@@ -308,11 +308,15 @@ def login(
 
         query = server.query
         if "error" in query:
-            description = (query.get("error_description") or query.get("error") or ["login was denied"])[0]
+            description = (
+                query.get("error_description") or query.get("error") or ["login was denied"]
+            )[0]
             raise LoginError(description)
         returned_state = (query.get("state") or [""])[0]
         if not secrets.compare_digest(returned_state, state):
-            raise LoginError("Login response failed the state check. Run `openai-radar login` again.")
+            raise LoginError(
+                "Login response failed the state check. Run `openai-radar login` again."
+            )
         code = (query.get("code") or [""])[0]
         if not code:
             raise LoginError("Login response did not include an authorization code.")

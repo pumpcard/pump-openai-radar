@@ -93,9 +93,7 @@ async def scan_assistants() -> str:
     result = await _scan_one("assistants")
     lines = [f"Found {len(result.assistants)} assistant(s)."]
     for a in result.assistants[:50]:
-        lines.append(
-            f"  {a.id} | {a.name or '(unnamed)'} | model={a.model} | tools={a.tool_count}"
-        )
+        lines.append(f"  {a.id} | {a.name or '(unnamed)'} | model={a.model} | tools={a.tool_count}")
     if result.relationships:
         lines.append(f"\nDetected {len(result.relationships)} service relationship(s):")
         for rel in result.relationships[:50]:
@@ -181,7 +179,13 @@ async def run_findings() -> str:
     """Run the findings engine over everything scanned so far in this session."""
     result = _get_result()
     if not any(
-        [result.assistants, result.vector_stores, result.fine_tunes, result.batch_jobs, result.usage]
+        [
+            result.assistants,
+            result.vector_stores,
+            result.fine_tunes,
+            result.batch_jobs,
+            result.usage,
+        ]
     ):
         return "Nothing scanned yet — run one or more scan tools first."
 

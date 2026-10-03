@@ -144,7 +144,9 @@ def _payload(result: RunResult) -> dict:
 
 @app.command()
 def run(
-    project: str | None = typer.Option(None, "--project", help="Scope the scan to this project ID."),
+    project: str | None = typer.Option(
+        None, "--project", help="Scope the scan to this project ID."
+    ),
     api_key: str | None = typer.Option(None, "--api-key", help="Overrides OPENAI_API_KEY."),
     admin_key: str | None = typer.Option(
         None, "--admin-key", help="Overrides OPENAI_ADMIN_KEY. Unlocks org-wide usage data."
@@ -203,7 +205,9 @@ def run(
 
 @app.command()
 def findings(
-    project: str | None = typer.Option(None, "--project", help="Scope the scan to this project ID."),
+    project: str | None = typer.Option(
+        None, "--project", help="Scope the scan to this project ID."
+    ),
     api_key: str | None = typer.Option(None, "--api-key", help="Overrides OPENAI_API_KEY."),
     admin_key: str | None = typer.Option(None, "--admin-key", help="Overrides OPENAI_ADMIN_KEY."),
     lookback: int = typer.Option(30, "--lookback", help="Days of usage history."),
@@ -220,7 +224,9 @@ def findings(
         raise typer.Exit(code=1)
 
     if output == "json":
-        sys.stdout.write(json.dumps([f.as_dict() for f in result.findings], indent=2, default=str) + "\n")
+        sys.stdout.write(
+            json.dumps([f.as_dict() for f in result.findings], indent=2, default=str) + "\n"
+        )
     else:
         _render_findings(result.findings)
 

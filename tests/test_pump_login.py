@@ -12,8 +12,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import pump_login
-from pump_login import LoginError, code_challenge_s256, login
+from openai_radar import pump_login
+from openai_radar.pump_login import LoginError, code_challenge_s256, login
 
 
 class _PumpHandler(BaseHTTPRequestHandler):

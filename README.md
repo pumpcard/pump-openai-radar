@@ -196,7 +196,7 @@ source .venv/bin/activate
 uv pip install -e ".[all]"
 ```
 
-Root modules (`cli.py`, `client.py`, `runner.py`, `findings.py`, `pump_login.py`) and `src/open_radar` are the `openai_radar` package. `src/openai_radar/__init__.py` is what the editable install exposes.
+The package lives in `src/openai_radar`, including `cli.py` and `pump_login.py`.
 
 The repo launcher and `cli.py` are the same CLI:
 

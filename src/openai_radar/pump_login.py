@@ -339,7 +339,7 @@ def login(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """``python pump_login.py login|logout|status`` for shells that invoke this module directly."""
+    """``python -m openai_radar.pump_login login|logout|status``."""
     import argparse
 
     parser = argparse.ArgumentParser(prog="openai-radar")

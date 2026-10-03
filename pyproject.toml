@@ -47,8 +47,14 @@ agents = ["openai-agents>=0.22.0"]        # run Radar as openai-agents tools
 # Full install
 all = ["openai-radar[agents]"]
 
+dev = ["pytest>=8.0"]
+
 [dependency-groups]
-dev = ["ruff>=0.16.10"]
+dev = ["ruff>=0.16.10", "pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [project.urls]
 Homepage = "https://github.com/gomorsmi/openai-radar"

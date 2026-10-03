@@ -1,14 +1,23 @@
-"""Importable ``openai_radar`` package for this checkout.
+"""openai-radar: FinOps scanner for OpenAI infrastructure.
 
-Scanner code lives at the repository root (``cli.py``, ``client.py``, and the
-rest) and under ``src/open_radar``. This module is what ``pip install -e .``
-exposes, and it points ``__path__`` at both places.
+Part of the Hyperscaler Radar suite.
 """
 
-from pathlib import Path
+__version__ = "2.1.0"
+__author__ = "Mor Michaeli"
 
-_root = Path(__file__).resolve().parents[2]
-_init = _root / "__init__.py"
-exec(compile(_init.read_text(encoding="utf-8"), str(_init), "exec"), globals())
+from openai_radar.client import RadarClient, RadarError
+from openai_radar.findings import Finding, FindingEngine, Severity
+from openai_radar.runner import RunConfig, Runner, RunResult
 
-__path__ = [str(_root), str(_root / "src" / "open_radar")]
+__all__ = [
+    "Finding",
+    "FindingEngine",
+    "RadarClient",
+    "RadarError",
+    "RunConfig",
+    "RunResult",
+    "Runner",
+    "Severity",
+    "__version__",
+]

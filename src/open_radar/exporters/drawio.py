@@ -49,9 +49,7 @@ SERVICE_LABEL = {
 
 def _style(kind: str) -> str:
     return (
-        "rounded=1;whiteSpace=wrap;html=1;"
-        f"fillColor={FILL[kind]};"
-        "verticalAlign=middle;fontSize=11;"
+        f"rounded=1;whiteSpace=wrap;html=1;fillColor={FILL[kind]};verticalAlign=middle;fontSize=11;"
     )
 
 
@@ -118,10 +116,7 @@ class DrawioExporter:
         assistant_cells = add_column(
             "Assistants",
             "assistant",
-            [
-                (a.id, f"{_truncate(a.name or a.id)}\n{a.model}")
-                for a in self.result.assistants
-            ],
+            [(a.id, f"{_truncate(a.name or a.id)}\n{a.model}") for a in self.result.assistants],
         )
         store_cells = add_column(
             "Vector stores",

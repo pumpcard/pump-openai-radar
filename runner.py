@@ -143,7 +143,12 @@ class Runner:
             coros.append(("batch_jobs", BatchJobScanner(client).scan(cfg.project_id)))
         if cfg.scan_usage:
             coros.append(
-                ("usage", UsageScanner(client, lookback_days=cfg.usage_lookback_days).scan(cfg.project_id))
+                (
+                    "usage",
+                    UsageScanner(client, lookback_days=cfg.usage_lookback_days).scan(
+                        cfg.project_id
+                    ),
+                )
             )
 
         # Run all scanners concurrently
@@ -153,6 +158,7 @@ class Runner:
             if isinstance(outcome, Exception):
                 # Surface non-fatal scanner failures without aborting
                 import warnings
+
                 warnings.warn(f"Scanner '{key}' failed: {outcome}", RuntimeWarning, stacklevel=2)
             else:
                 setattr(result, key, outcome)

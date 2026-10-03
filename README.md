@@ -49,7 +49,7 @@ result.export_drawio("./out/openai_arch.drawio")
 ```python
 client = RadarClient(
     api_key="sk-proj-...",
-    admin_key="sk-admin-...",   # unlocks cross-project usage data
+    admin_key="sk-admin-...",  # unlocks cross-project usage data
 )
 result = Runner.run_sync(client, config)
 ```
@@ -106,7 +106,7 @@ pip install openai-radar[agents]
 from openai_radar.agents import build_radar_agent
 from agents import Runner
 
-agent  = build_radar_agent()
+agent = build_radar_agent()
 result = Runner.run_sync(agent, "Scan my org and flag any cost anomalies")
 print(result.final_output)
 ```

@@ -30,8 +30,7 @@ def build_radar_agent(model: str = "gpt-4o", name: str = "OpenAI Radar Agent"):
         from agents import Agent
     except ImportError as e:
         raise ImportError(
-            "openai-agents SDK not found. "
-            "Install with: pip install openai-radar[agents]"
+            "openai-agents SDK not found. Install with: pip install openai-radar[agents]"
         ) from e
 
     from openai_radar.agents.tools import (

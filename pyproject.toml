@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "openai-radar"
-version = "2.2.0"
+name = "pump-openai-radar"
+version = "0.1.0"
 description = "OpenAI infrastructure FinOps SDK — scan, analyze, and export your OpenAI org resources"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Mor Michaeli" }]
+authors = [{ name = "pump.co" },{ name = "Mor Michaeli" }]
 keywords = ["openai", "finops", "cloud-cost", "llm", "radar", "hyperscaler"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

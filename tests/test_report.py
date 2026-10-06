@@ -107,7 +107,7 @@ def test_fetch_cost_report_shapes_rows_and_drops_zeros() -> None:
 
 def test_fetch_requires_an_admin_key() -> None:
     client = RadarClient(api_key="sk-test")
-    with pytest.raises(ReportError, match="admin key"):
+    with pytest.raises(ReportError, match="OPENAI_ADMIN_KEY"):
         asyncio.run(fetch_cost_report(client))
 
 

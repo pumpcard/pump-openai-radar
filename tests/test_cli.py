@@ -316,7 +316,7 @@ def test_run_report_requires_an_admin_key(monkeypatch: pytest.MonkeyPatch, tmp_p
     )
 
     assert result.exit_code == 1
-    assert "admin key" in result.stdout.lower()
+    assert "OPENAI_ADMIN_KEY" in result.stdout
 
 
 def test_run_reports_upload_failure(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

@@ -14,7 +14,7 @@ from openai_radar import (
 
 
 def test_version() -> None:
-    assert __version__ == "2.2.0"
+    assert __version__ == "0.1.0"
 
 
 def test_public_names_are_exported() -> None:

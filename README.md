@@ -90,6 +90,11 @@ openai-radar run --project proj_xxx --lookback 7
 # Push the org cost report to Pump (admin key required)
 openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
 
+# Log in to Pump, check the stored token, or forget it
+openai-radar login
+openai-radar status
+openai-radar logout
+
 # Print the version
 openai-radar version
 ```
@@ -219,6 +224,51 @@ src/openai_radar/
 ├── upload.py            # Pump presigned-URL upload (role: report)
 ├── agents/              # openai-agents tools + build_radar_agent()
 └── cli.py               # openai-radar CLI
+```
+
+---
+
+## Development
+
+Python 3.10 or newer. From a checkout:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[all]"
+```
+
+With [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[all]"
+```
+
+The package lives in `src/openai_radar`, including `cli.py` and `pump_login.py`.
+
+From this checkout:
+
+```bash
+./openai-radar --help
+./openai-radar login
+./openai-radar status
+./openai-radar logout
+./openai-radar version
+```
+
+`login` opens a browser for the Pump OAuth flow and writes the token to
+`$XDG_CONFIG_HOME/openai-radar/credentials.json`, or
+`~/.config/openai-radar/credentials.json` when `XDG_CONFIG_HOME` is unset.
+`OPENAI_RADAR_CONFIG_DIR` overrides that directory. `PUMP_API_BASE` and
+`PUMP_APP_BASE` override the Pump origins, as do `--api-base` and `--app-base`.
+Scans still read `OPENAI_API_KEY` and, for org-wide usage, `OPENAI_ADMIN_KEY`.
+
+Login tests talk to a local fake Pump:
+
+```bash
+python -m unittest tests.test_pump_login
 ```
 
 ---

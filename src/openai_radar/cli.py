@@ -16,6 +16,8 @@ from openai_radar import __version__
 from openai_radar.client import RadarClient, RadarError
 from openai_radar.findings import Finding
 from openai_radar.runner import RunConfig, Runner, RunResult
+from openai_radar.pump_login import LoginError, clear_credentials, load_credentials
+from openai_radar.pump_login import login as pump_login
 
 console = Console()
 
@@ -307,13 +309,55 @@ def findings(
 
 
 @app.command()
+def login(
+    api_base: str | None = typer.Option(
+        None,
+        "--api-base",
+        help="Pump API origin. Defaults to $PUMP_API_BASE or https://api.pump.co.",
+    ),
+    app_base: str | None = typer.Option(
+        None,
+        "--app-base",
+        help="Pump app origin. Defaults to $PUMP_APP_BASE or https://app.pump.co.",
+    ),
+) -> None:
+    """Log in with Pump (OAuth 2.0 authorization code + PKCE) and store the token."""
+    try:
+        pump_login(api_base=api_base, app_base=app_base)
+    except LoginError as exc:
+        typer.echo(f"Login failed: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def logout() -> None:
+    """Forget the Pump token stored by `login`."""
+    typer.echo("Logged out." if clear_credentials() else "Not logged in.")
+
+
+@app.command()
+def status() -> None:
+    """Show whether a Pump token is stored, without printing the token."""
+    try:
+        creds = load_credentials()
+    except LoginError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+    if creds is None:
+        typer.echo("Not logged in. Run `openai-radar login`.")
+        raise typer.Exit(code=1)
+    upload = f" upload {creds.upload_id}" if creds.upload_id else ""
+    typer.echo(f"Logged in to {creds.api_base}.{upload} Token expires {creds.expires_at}.")
+
+
+@app.command()
 def version() -> None:
     """Print the version."""
     console.print(f"openai-radar {__version__}")
 
 
 def main() -> None:
-    app()
+    app(prog_name="openai-radar")
 
 
 if __name__ == "__main__":

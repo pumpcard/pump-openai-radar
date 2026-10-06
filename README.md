@@ -103,8 +103,7 @@ that path; with `--csv-dir` and no `--report-file` it is `{csv-dir}/report.csv`.
 
 ## Pump onboarding
 
-Same push as [pump-aws-radar](https://github.com/pumpcard/pump-aws-radar): the token
-is exchanged for a presigned S3 URL, and only the CSV leaves the machine.
+The token is exchanged for a presigned S3 URL, and only the CSV leaves the machine.
 
 1. In the Pump app, mint an upload token (`POST /api/v1/estimate/radar/mint`). Pump
    shows a ready-to-paste command.
@@ -117,17 +116,18 @@ is exchanged for a presigned S3 URL, and only the CSV leaves the machine.
    This scans the org, pulls daily costs from `/organization/costs`, writes
    `report.csv`, and uploads that file. `--csv-dir` and `--drawio-file` still
    work on the same command. Pass `--report-file` to choose where the CSV is written.
+
 3. Pump detects `report.csv` and runs its analysis.
 
 `report.csv` columns:
 
-| Column | Meaning |
-|--------|---------|
-| Date | UTC day (`YYYY-MM-DD`) |
-| ProjectID | OpenAI project, or `-` |
-| LineItem | Cost line item (model and token category) |
-| Amount | Non-zero cost, 6 decimal places |
-| Currency | e.g. `USD` |
+| Column    | Meaning                                   |
+| --------- | ----------------------------------------- |
+| Date      | UTC day (`YYYY-MM-DD`)                    |
+| ProjectID | OpenAI project, or `-`                    |
+| LineItem  | Cost line item (model and token category) |
+| Amount    | Non-zero cost, 6 decimal places           |
+| Currency  | e.g. `USD`                                |
 
 Zero-cost buckets are omitted. The token carries no company id — Pump binds the
 company and the S3 key server-side. The exchange defaults to `https://api.pump.co`:
@@ -176,15 +176,15 @@ agent = Agent(
 
 ## Findings engine
 
-| Rule ID    | Severity | Condition |
-|------------|----------|-----------|
-| ASST_001   | LOW      | Assistant has zero tools |
-| ASST_002   | INFO     | Code Interpreter enabled (file storage costs) |
-| VS_001     | MEDIUM   | Vector store > 5 GB |
-| VS_002     | HIGH     | Vector store expires within 7 days |
-| FT_001     | MEDIUM   | Fine-tune job in `failed` state |
-| BATCH_001  | HIGH     | Batch job failure rate > 10% |
-| USAGE_001  | MEDIUM   | Model consumes > 10M tokens in lookback window |
+| Rule ID   | Severity | Condition                                      |
+| --------- | -------- | ---------------------------------------------- |
+| ASST_001  | LOW      | Assistant has zero tools                       |
+| ASST_002  | INFO     | Code Interpreter enabled (file storage costs)  |
+| VS_001    | MEDIUM   | Vector store > 5 GB                            |
+| VS_002    | HIGH     | Vector store expires within 7 days             |
+| FT_001    | MEDIUM   | Fine-tune job in `failed` state                |
+| BATCH_001 | HIGH     | Batch job failure rate > 10%                   |
+| USAGE_001 | MEDIUM   | Model consumes > 10M tokens in lookback window |
 
 ---
 
@@ -193,15 +193,15 @@ agent = Agent(
 `AssistantScanner` inspects each assistant's `instructions` field for external service signals
 and emits `ServiceRelationship` objects (visualized as edges in the draw.io diagram):
 
-| Kind | Signals |
-|------|---------|
-| AWS | `aws`, `s3`, `ec2`, `lambda`, `dynamodb`, `sqs` |
-| GCP | `gcp`, `bigquery`, `gcs`, `google cloud` |
-| AZURE | `azure`, `blob.core.windows`, `cosmosdb` |
-| DATABASE | `postgres`, `mysql`, `mongo`, `redis`, `neon` |
-| SLACK | `slack` |
-| EMAIL | `sendgrid`, `mailgun`, `smtp` |
-| WEBHOOK | `webhook`, `http://` |
+| Kind     | Signals                                         |
+| -------- | ----------------------------------------------- |
+| AWS      | `aws`, `s3`, `ec2`, `lambda`, `dynamodb`, `sqs` |
+| GCP      | `gcp`, `bigquery`, `gcs`, `google cloud`        |
+| AZURE    | `azure`, `blob.core.windows`, `cosmosdb`        |
+| DATABASE | `postgres`, `mysql`, `mongo`, `redis`, `neon`   |
+| SLACK    | `slack`                                         |
+| EMAIL    | `sendgrid`, `mailgun`, `smtp`                   |
+| WEBHOOK  | `webhook`, `http://`                            |
 
 ---
 

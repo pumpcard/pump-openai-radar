@@ -27,8 +27,10 @@ class _FakeResp:
 
 
 def test_upload_csvs_exchanges_then_puts(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    report = tmp_path / "report.csv"
-    report.write_text("Date,ProjectID,LineItem,Amount,Currency\n2026-01-01,proj,gpt-4o,1.0,USD\n")
+    billing = tmp_path / "report.csv"
+    inventory = tmp_path / "usage.csv"
+    billing.write_text("Date,ProjectID,LineItem,Amount,Currency\n2026-01-01,proj,gpt-4o,1.0,USD\n")
+    inventory.write_text("model,input_tokens,output_tokens\ngpt-4o,3,4\n")
 
     calls = []
 
@@ -44,17 +46,20 @@ def test_upload_csvs_exchanges_then_puts(monkeypatch: pytest.MonkeyPatch, tmp_pa
     upload.upload_csvs(
         api_base="http://localhost:8001/",
         token="tok",
-        files={"report": str(report)},
+        files={"billing": str(billing), "inventory": str(inventory)},
     )
 
     posts = [c for c in calls if c.method == "POST"]
     puts = [c for c in calls if c.method == "PUT"]
-    assert len(posts) == 1 and len(puts) == 1
+    assert len(posts) == 2 and len(puts) == 2
     assert posts[0].full_url == "http://localhost:8001/api/v1/estimate/radar/urls"
-    assert json.loads(posts[0].data.decode()) == {"token": "tok", "role": "report"}
-    assert puts[0].full_url == "https://s3/report"
+    assert json.loads(posts[0].data.decode()) == {"token": "tok", "role": "billing"}
+    assert json.loads(posts[1].data.decode()) == {"token": "tok", "role": "inventory"}
+    assert puts[0].full_url == "https://s3/billing"
+    assert puts[1].full_url == "https://s3/inventory"
     assert puts[0].headers["Content-type"] == "text/csv"
-    assert puts[0].data == report.read_bytes()
+    assert puts[0].data == billing.read_bytes()
+    assert puts[1].data == inventory.read_bytes()
     # Both requests send a real User-Agent (Cloudflare blocks the urllib default).
     assert posts[0].headers["User-agent"] == upload._USER_AGENT
     assert puts[0].headers["User-agent"] == upload._USER_AGENT
@@ -71,7 +76,7 @@ def test_expired_token_raises_clear_error(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(upload.urllib.request, "urlopen", fake_urlopen)
 
     with pytest.raises(upload.UploadError, match="expired"):
-        upload.upload_csvs("http://x", "tok", {"report": str(report)})
+        upload.upload_csvs("http://x", "tok", {"billing": str(report)})
 
 
 def test_exchange_without_upload_url_raises(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -84,9 +89,9 @@ def test_exchange_without_upload_url_raises(monkeypatch: pytest.MonkeyPatch, tmp
     monkeypatch.setattr(upload.urllib.request, "urlopen", fake_urlopen)
 
     with pytest.raises(upload.UploadError, match="upload_url"):
-        upload.upload_csvs("http://x", "tok", {"report": str(report)})
+        upload.upload_csvs("http://x", "tok", {"billing": str(report)})
 
 
 def test_unknown_role_rejected(tmp_path) -> None:
     with pytest.raises(upload.UploadError, match="Unknown upload role"):
-        upload.upload_csvs("http://x", "tok", {"billing": "nope.csv"})
+        upload.upload_csvs("http://x", "tok", {"report": "nope.csv"})

@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 from openai_radar.cli import app
 from openai_radar.client import RadarError
 from openai_radar.findings import Finding, Severity
-from openai_radar.models.base import AssistantInfo
+from openai_radar.models.base import AssistantInfo, ModelUsage
 from openai_radar.runner import RunConfig, RunResult
 
 runner = CliRunner()
@@ -145,12 +145,20 @@ def test_run_table_renders_findings_and_exports(monkeypatch: pytest.MonkeyPatch,
 
 
 def test_run_uploads_the_cost_report(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    _patch_run(monkeypatch, RunResult(config=RunConfig(project_id="proj_x", usage_lookback_days=7)))
+    _patch_run(
+        monkeypatch,
+        RunResult(
+            config=RunConfig(project_id="proj_x", usage_lookback_days=7),
+            usage=[
+                ModelUsage(model="gpt-4o", input_tokens=3, output_tokens=4, project_id="proj_x")
+            ],
+        ),
+    )
     report_path = tmp_path / "report.csv"
     seen: dict[str, object] = {}
 
     async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
-        from openai_radar.report import CostReport
+        from openai_radar.scanners.report import CostReport
 
         seen["lookback"] = lookback_days
         seen["project"] = project_id
@@ -172,7 +180,7 @@ def test_run_uploads_the_cost_report(monkeypatch: pytest.MonkeyPatch, tmp_path) 
         seen["token"] = token
         seen["files"] = files
 
-    monkeypatch.setattr("openai_radar.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
     monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
 
     result = runner.invoke(
@@ -201,8 +209,10 @@ def test_run_uploads_the_cost_report(monkeypatch: pytest.MonkeyPatch, tmp_path) 
     assert seen["project"] == "proj_x"
     assert seen["api_base"] == "http://localhost:8001"
     assert seen["token"] == "tok"
-    assert seen["files"] == {"report": str(report_path)}
+    usage_path = report_path.with_name("usage.csv")
+    assert seen["files"] == {"billing": str(report_path), "inventory": str(usage_path)}
     assert "gpt-4o, input" in report_path.read_text(encoding="utf-8")
+    assert "gpt-4o" in usage_path.read_text(encoding="utf-8")
     assert "on its way to Pump" in result.stdout
 
 
@@ -213,7 +223,7 @@ def test_run_can_write_the_report_without_uploading(
     destination = tmp_path / "custom.csv"
 
     async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
-        from openai_radar.report import CostReport
+        from openai_radar.scanners.report import CostReport
 
         return CostReport(
             rows=[
@@ -230,7 +240,7 @@ def test_run_can_write_the_report_without_uploading(
     def fail_upload(*args: object, **kwargs: object) -> None:
         raise AssertionError("upload should not run without a token")
 
-    monkeypatch.setattr("openai_radar.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
     monkeypatch.setattr("openai_radar.upload.upload_csvs", fail_upload)
 
     result = runner.invoke(
@@ -254,12 +264,18 @@ def test_run_can_write_the_report_without_uploading(
 def test_run_upload_defaults_the_report_into_csv_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:
-    _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    _patch_run(
+        monkeypatch,
+        RunResult(
+            config=RunConfig(),
+            usage=[ModelUsage(model="gpt-4o", input_tokens=1, output_tokens=2)],
+        ),
+    )
     csv_dir = tmp_path / "out"
     seen: dict[str, object] = {}
 
     async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
-        from openai_radar.report import CostReport
+        from openai_radar.scanners.report import CostReport
 
         return CostReport(
             rows=[
@@ -276,7 +292,7 @@ def test_run_upload_defaults_the_report_into_csv_dir(
     def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
         seen["files"] = files
 
-    monkeypatch.setattr("openai_radar.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
     monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
 
     result = runner.invoke(
@@ -295,8 +311,12 @@ def test_run_upload_defaults_the_report_into_csv_dir(
     )
 
     assert result.exit_code == 0, result.stdout
-    assert seen["files"] == {"report": str(csv_dir / "report.csv")}
+    assert seen["files"] == {
+        "billing": str(csv_dir / "report.csv"),
+        "inventory": str(csv_dir / "usage.csv"),
+    }
     assert (csv_dir / "report.csv").is_file()
+    assert (csv_dir / "usage.csv").is_file()
 
 
 def test_run_report_requires_an_admin_key(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -323,7 +343,7 @@ def test_run_reports_upload_failure(monkeypatch: pytest.MonkeyPatch, tmp_path) -
     _patch_run(monkeypatch, RunResult(config=RunConfig()))
 
     async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
-        from openai_radar.report import CostReport
+        from openai_radar.scanners.report import CostReport
 
         return CostReport(
             rows=[
@@ -342,7 +362,7 @@ def test_run_reports_upload_failure(monkeypatch: pytest.MonkeyPatch, tmp_path) -
 
         raise UploadError("token was rejected")
 
-    monkeypatch.setattr("openai_radar.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
     monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
 
     destination = tmp_path / "report.csv"
@@ -434,7 +454,7 @@ def _patch_cost_report(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
     seen: dict[str, object] = {}
 
     async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
-        from openai_radar.report import CostReport
+        from openai_radar.scanners.report import CostReport
 
         return CostReport(
             rows=[
@@ -453,13 +473,19 @@ def _patch_cost_report(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
         seen["token"] = token
         seen["files"] = files
 
-    monkeypatch.setattr("openai_radar.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
     monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
     return seen
 
 
 def test_run_upload_uses_the_login_token(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    _patch_run(
+        monkeypatch,
+        RunResult(
+            config=RunConfig(),
+            usage=[ModelUsage(model="gpt-4o", input_tokens=1, output_tokens=2)],
+        ),
+    )
     _save_login(tmp_path, monkeypatch)
     seen = _patch_cost_report(monkeypatch)
     report_path = tmp_path / "report.csv"
@@ -481,7 +507,10 @@ def test_run_upload_uses_the_login_token(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert result.exit_code == 0, result.stdout
     assert seen["token"] == "stored-token"
     assert seen["api_base"] == "http://login.example"
-    assert seen["files"] == {"report": str(report_path)}
+    assert seen["files"] == {
+        "billing": str(report_path),
+        "inventory": str(report_path.with_name("usage.csv")),
+    }
     assert "stored-token" not in result.stdout
 
 

@@ -101,16 +101,18 @@ openai-radar version
 
 Flags follow the Radar suite convention: `--output/-o` selects `table` or `json`,
 `--out-file` writes the JSON payload, `--csv-dir` writes per-resource CSVs.
-`--upload` writes `report.csv` and pushes it with the token from `openai-radar login`.
-`--upload-token` does the same with a one-shot token and overrides the stored login.
-`--report-file` chooses the path; with `--csv-dir` and no `--report-file` it is
-`{csv-dir}/report.csv`.
+`--upload` writes `report.csv` (costs) and `usage.csv` (token usage) and pushes
+them with the token from `openai-radar login`. Costs upload as role `billing`;
+usage uploads as role `inventory`. `--upload-token` does the same with a one-shot
+token and overrides the stored login. `--report-file` chooses the cost CSV path;
+with `--csv-dir` and no `--report-file` it is `{csv-dir}/report.csv`. `usage.csv`
+is written next to it.
 
 ---
 
 ## Pump onboarding
 
-The token is exchanged for a presigned S3 URL, and only the CSV leaves the machine.
+The token is exchanged for a presigned S3 URL, and only the cost and usage CSVs leave the machine.
 
 1. Log in. This runs the browser OAuth flow and stores an upload token locally:
 
@@ -125,10 +127,11 @@ The token is exchanged for a presigned S3 URL, and only the CSV leaves the machi
    ```
 
    This scans the org, pulls daily costs from `/organization/costs`, writes
-   `report.csv`, and uploads that file with the stored token. `--csv-dir` and
-   `--drawio-file` still work on the same command. Pass `--report-file` to choose
-   where the CSV is written.
-3. Pump detects `report.csv` and runs its analysis.
+   `report.csv` and `usage.csv`, and uploads them with the stored token. Costs
+   are role `billing`; usage is role `inventory`. `--csv-dir` and `--drawio-file`
+   still work on the same command. Pass `--report-file` to choose where the cost
+   CSV is written.
+3. Pump detects the upload and runs its analysis.
 
 `openai-radar status` shows whether a token is stored (not the token itself).
 `openai-radar logout` deletes it. A one-shot token still works without logging in:
@@ -158,9 +161,10 @@ openai-radar run --admin-key sk-admin-... --upload-token <TOKEN> --api-base http
 PUMP_API_BASE=http://localhost:8001 openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
 ```
 
-`openai_radar/upload.py` posts `{api_base}/api/v1/estimate/radar/urls` with
-`{"token", "role": "report"}`, then `PUT`s the CSV as `Content-Type: text/csv`
-(the presigned URL signs that content type).
+`openai_radar/upload.py` posts `{api_base}/api/v1/estimate/radar/urls` once per
+file, with `{"token", "role": "billing"}` for costs and
+`{"token", "role": "inventory"}` for usage, then `PUT`s each CSV as
+`Content-Type: text/csv` (the presigned URL signs that content type).
 
 ---
 
@@ -233,11 +237,10 @@ src/openai_radar/
 ├── runner.py            # Runner, RunConfig, RunResult
 ├── findings.py          # FindingEngine, Finding, Severity
 ├── models/base.py       # Pydantic v2 models for all resource types
-├── scanners/            # One scanner per resource type
+├── scanners/            # One scanner per resource type, plus the cost report
 ├── exporters/           # CSV + draw.io exporters
 ├── pump_login.py        # `login` / `logout` / `status` (OAuth + PKCE)
-├── report.py            # organization cost report.csv
-├── upload.py            # Pump presigned-URL upload (role: report)
+├── upload.py            # Pump presigned-URL upload (billing + inventory)
 ├── agents/              # openai-agents tools + build_radar_agent()
 └── cli.py               # openai-radar CLI
 ```

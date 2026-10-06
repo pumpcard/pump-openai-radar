@@ -2,9 +2,12 @@
 Cost report CSV for Pump onboarding.
 
 Pump's estimate flow (the same ``/api/v1/estimate/radar/urls`` exchange
-pump-aws-radar uses for billing.csv) accepts one OpenAI file: ``report.csv``.
-Rows come from the organization Costs API, one per (day, project, line item),
-which is the dollar view the admin key can see.
+pump-aws-radar uses) takes two OpenAI files. This module builds the cost
+file, uploaded as role ``billing``. Token usage, uploaded as role
+``inventory``, is written beside :mod:`openai_radar.scanners.usage`.
+
+Cost rows come from the organization Costs API, one per (day, project,
+line item), which is the dollar view the admin key can see.
 """
 
 from __future__ import annotations

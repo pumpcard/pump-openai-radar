@@ -1,14 +1,15 @@
 """
-Push a report CSV to Pump's self-serve onboarding endpoint.
+Push onboarding CSVs to Pump's self-serve onboarding endpoint.
 
 Same exchange as pump-aws-radar (``POST /api/v1/estimate/radar/urls``): the
 token from ``openai-radar login`` (or ``--upload-token``) is traded for a
-presigned S3 PUT URL, and the report CSV is uploaded directly. The token
-carries no company id — the backend pins the company and derives the S3 key
-server-side, so the token can only write its own upload's prefix.
+presigned S3 PUT URL, and each CSV is uploaded directly. The token carries no
+company id — the backend pins the company and derives the S3 key server-side,
+so the token can only write its own upload's prefix.
 
 No Pump AWS credentials are involved on the client. The presigned URL already
-carries everything the PUT needs. Only the report CSV leaves the machine.
+carries everything the PUT needs. Costs go up as ``billing`` and token usage
+as ``inventory``.
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ _USER_AGENT = f"openai-radar/{__version__}"
 # route is service/api/endpoints/estimate_radar.py :: exchange_token_for_url.
 _URLS_PATH = "/api/v1/estimate/radar/urls"
 
-# Roles the backend recognizes for this client. OpenAI onboarding sends one file.
-_ROLES = ("report",)
+# Roles the backend recognizes. Cost is billing; token usage is inventory.
+_ROLES = ("billing", "inventory")
 
 _HTTP_TIMEOUT_SECONDS = 60
 
@@ -102,7 +103,8 @@ def upload_csvs(api_base: str, token: str, files: dict[str, str]) -> None:
 
     :param api_base: Pump API base, e.g. https://api.pump.co (no trailing /api).
     :param token:    the --upload-token minted in the Pump app.
-    :param files:    {role: local_csv_path}; roles must be a subset of _ROLES.
+    :param files:    {role: local_csv_path}. ``billing`` is the cost CSV,
+                     ``inventory`` is the usage CSV.
     """
     unknown = set(files) - set(_ROLES)
     if unknown:

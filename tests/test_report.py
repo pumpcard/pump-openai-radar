@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import pytest
 
 from openai_radar.client import RadarClient, RadarError
-from openai_radar.report import (
+from openai_radar.scanners.report import (
     COSTS_PATH,
     REPORT_FIELDS,
     CostReport,
@@ -165,7 +165,7 @@ def test_fetch_raises_when_the_first_page_fails() -> None:
 
 
 def test_fetch_marks_truncation_at_the_page_cap(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("openai_radar.report.MAX_PAGES", 1)
+    monkeypatch.setattr("openai_radar.scanners.report.MAX_PAGES", 1)
     client = RadarClient(api_key="sk-test", admin_key="sk-admin")
 
     async def get_org(path: str, params: dict[str, object] | None = None) -> dict[str, object]:

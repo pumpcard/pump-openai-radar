@@ -15,9 +15,10 @@ from rich.table import Table
 from openai_radar import __version__
 from openai_radar.client import RadarClient, RadarError
 from openai_radar.findings import Finding
-from openai_radar.runner import RunConfig, Runner, RunResult
+from openai_radar.models.base import ModelUsage
 from openai_radar.pump_login import LoginError, clear_credentials, load_credentials
 from openai_radar.pump_login import login as pump_login
+from openai_radar.runner import RunConfig, Runner, RunResult
 
 console = Console()
 
@@ -192,9 +193,14 @@ def _write_and_maybe_upload_report(
     api_base: str,
     report_file: str | None,
     csv_dir: str | None,
+    usage: list[ModelUsage],
 ) -> None:
-    """Build report.csv from org costs and, when a token is set, PUT it to Pump."""
-    from openai_radar.report import ReportError, fetch_cost_report, write_report_csv
+    """Write the cost report and usage CSV, and PUT them to Pump when a token is set.
+
+    Costs upload as role ``billing``. Usage uploads as role ``inventory``.
+    """
+    from openai_radar.scanners.report import ReportError, fetch_cost_report, write_report_csv
+    from openai_radar.scanners.usage import write_usage_csv
     from openai_radar.upload import UploadError, upload_csvs
 
     destination = _report_destination(report_file, csv_dir)
@@ -212,16 +218,24 @@ def _write_and_maybe_upload_report(
     written = write_report_csv(destination, report.rows)
     console.print(f"[green]Wrote[/green] {written}")
 
+    files = {"billing": str(written)}
+    if usage:
+        usage_path = write_usage_csv(destination.with_name("usage.csv"), usage)
+        console.print(f"[green]Wrote[/green] {usage_path}")
+        files["inventory"] = str(usage_path)
+    elif upload_token:
+        console.print("[yellow]No usage rows to upload as inventory.[/yellow]")
+
     if not upload_token:
         return
 
-    console.print(f"Uploading report.csv to Pump ({api_base})")
+    console.print(f"Uploading to Pump ({api_base})")
     try:
-        upload_csvs(api_base=api_base, token=upload_token, files={"report": str(written)})
+        upload_csvs(api_base=api_base, token=upload_token, files=files)
     except UploadError as exc:
         console.print(f"[bold red]Upload failed:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc
-    console.print("[green]Your OpenAI cost report is on its way to Pump.[/green]")
+    console.print("[green]Your OpenAI cost and usage data is on its way to Pump.[/green]")
 
 
 def _payload(result: RunResult) -> dict:
@@ -255,7 +269,7 @@ def run(
     upload: bool = typer.Option(
         False,
         "--upload",
-        help="Upload report.csv with the token from `openai-radar login`.",
+        help="Upload costs as billing and usage as inventory, using `openai-radar login`.",
     ),
     upload_token: str | None = typer.Option(
         None,
@@ -326,6 +340,7 @@ def run(
             api_base=pump_base,
             report_file=report_file,
             csv_dir=csv_dir,
+            usage=result.usage,
         )
 
     if output != "json":

@@ -9,11 +9,18 @@ import threading
 import unittest
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from openai_radar import pump_login
-from openai_radar.pump_login import LoginError, code_challenge_s256, login
+from openai_radar.pump_login import (
+    LoginError,
+    PumpCredentials,
+    code_challenge_s256,
+    login,
+    token_is_expired,
+)
 
 
 class _PumpHandler(BaseHTTPRequestHandler):
@@ -138,6 +145,26 @@ class LoginFlowTest(unittest.TestCase):
                 stdout=lambda _line: None,
             )
         self.assertFalse(self.creds.exists())
+
+
+def _credentials(expires_at: str) -> PumpCredentials:
+    return PumpCredentials(
+        access_token="tok",
+        token_type="Bearer",
+        expires_at=expires_at,
+        upload_id=None,
+        scope="radar",
+        api_base="https://api.pump.co",
+    )
+
+
+def test_token_is_expired_uses_the_stored_timestamp() -> None:
+    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    past = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    assert token_is_expired(_credentials(future)) is False
+    assert token_is_expired(_credentials(past)) is True
+    assert token_is_expired(_credentials("")) is False
+    assert token_is_expired(_credentials("not-a-date")) is True
 
 
 if __name__ == "__main__":

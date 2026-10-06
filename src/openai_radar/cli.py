@@ -6,6 +6,7 @@ import asyncio
 import json
 import sys
 import time
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -14,9 +15,10 @@ from rich.table import Table
 from openai_radar import __version__
 from openai_radar.client import RadarClient, RadarError
 from openai_radar.findings import Finding
-from openai_radar.runner import RunConfig, Runner, RunResult
+from openai_radar.models.base import ModelUsage
 from openai_radar.pump_login import LoginError, clear_credentials, load_credentials
 from openai_radar.pump_login import login as pump_login
+from openai_radar.runner import RunConfig, Runner, RunResult
 
 console = Console()
 
@@ -130,6 +132,112 @@ def _render_findings(findings: list[Finding]) -> None:
     console.print(f"\n{summary}\n")
 
 
+def _resolve_pump_upload(
+    *,
+    upload: bool,
+    upload_token: str | None,
+    api_base: str | None,
+) -> tuple[str | None, str]:
+    """Return the token and API base for this run.
+
+    ``--upload-token`` wins. ``--upload`` uses the token stored by
+    ``openai-radar login``. An explicit ``--api-base`` (or ``PUMP_API_BASE``)
+    overrides the base saved at login.
+    """
+    from openai_radar.pump_login import (
+        DEFAULT_API_BASE,
+        LoginError,
+        load_credentials,
+        token_is_expired,
+    )
+
+    if upload_token:
+        return upload_token, api_base or DEFAULT_API_BASE
+    if not upload:
+        return None, api_base or DEFAULT_API_BASE
+
+    try:
+        creds = load_credentials()
+    except LoginError as exc:
+        console.print(f"[bold red]Upload failed:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+    if creds is None:
+        console.print(
+            "[bold red]Upload failed:[/bold red] Not logged in. "
+            "Run `openai-radar login`, or pass --upload-token."
+        )
+        raise typer.Exit(code=1)
+    if token_is_expired(creds):
+        console.print(
+            "[bold red]Upload failed:[/bold red] Pump login expired. "
+            "Run `openai-radar login` again."
+        )
+        raise typer.Exit(code=1)
+    return creds.access_token, api_base or creds.api_base
+
+
+def _report_destination(report_file: str | None, csv_dir: str | None) -> Path:
+    if report_file:
+        return Path(report_file)
+    if csv_dir:
+        return Path(csv_dir) / "report.csv"
+    return Path("report.csv")
+
+
+def _write_and_maybe_upload_report(
+    client: RadarClient,
+    *,
+    lookback_days: int,
+    project_id: str | None,
+    upload_token: str | None,
+    api_base: str,
+    report_file: str | None,
+    csv_dir: str | None,
+    usage: list[ModelUsage],
+) -> None:
+    """Write the cost report and usage CSV, and PUT them to Pump when a token is set.
+
+    Costs upload as role ``billing``. Usage uploads as role ``inventory``.
+    """
+    from openai_radar.scanners.report import ReportError, fetch_cost_report, write_report_csv
+    from openai_radar.scanners.usage import write_usage_csv
+    from openai_radar.upload import UploadError, upload_csvs
+
+    destination = _report_destination(report_file, csv_dir)
+    try:
+        report = asyncio.run(
+            fetch_cost_report(client, lookback_days=lookback_days, project_id=project_id)
+        )
+    except (ReportError, RadarError) as exc:
+        console.print(f"[bold red]Report failed:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if report.truncated:
+        console.print("[yellow]Cost report may be incomplete.[/yellow]")
+
+    written = write_report_csv(destination, report.rows)
+    console.print(f"[green]Wrote[/green] {written}")
+
+    files = {"billing": str(written)}
+    if usage:
+        usage_path = write_usage_csv(destination.with_name("usage.csv"), usage)
+        console.print(f"[green]Wrote[/green] {usage_path}")
+        files["inventory"] = str(usage_path)
+    elif upload_token:
+        console.print("[yellow]No usage rows to upload as inventory.[/yellow]")
+
+    if not upload_token:
+        return
+
+    console.print(f"Uploading to Pump ({api_base})")
+    try:
+        upload_csvs(api_base=api_base, token=upload_token, files=files)
+    except UploadError as exc:
+        console.print(f"[bold red]Upload failed:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print("[green]Your OpenAI cost and usage data is on its way to Pump.[/green]")
+
+
 def _payload(result: RunResult) -> dict:
     return {
         "assistants": [a.model_dump(mode="json") for a in result.assistants],
@@ -158,6 +266,27 @@ def run(
     drawio_file: str | None = typer.Option(
         None, "--drawio-file", help="Write a draw.io architecture diagram here."
     ),
+    upload: bool = typer.Option(
+        False,
+        "--upload",
+        help="Upload costs as billing and usage as inventory, using `openai-radar login`.",
+    ),
+    upload_token: str | None = typer.Option(
+        None,
+        "--upload-token",
+        help="Pump upload token. Overrides the token stored by `openai-radar login`.",
+    ),
+    api_base: str | None = typer.Option(
+        None,
+        "--api-base",
+        envvar="PUMP_API_BASE",
+        help="Pump API origin. Overrides the base stored by login.",
+    ),
+    report_file: str | None = typer.Option(
+        None,
+        "--report-file",
+        help="Write the cost report CSV here. With --upload, defaults to report.csv.",
+    ),
 ) -> None:
     """Scan an OpenAI organization."""
     if output not in ("table", "json"):
@@ -165,6 +294,9 @@ def run(
         raise typer.Exit(code=2)
 
     client = _build_client(api_key, admin_key, project)
+    token, pump_base = _resolve_pump_upload(
+        upload=upload, upload_token=upload_token, api_base=api_base
+    )
     config = RunConfig(project_id=project, usage_lookback_days=lookback)
 
     started = time.time()
@@ -198,6 +330,18 @@ def run(
 
     if drawio_file:
         console.print(f"[green]Wrote[/green] {result.export_drawio(drawio_file)}")
+
+    if token or report_file:
+        _write_and_maybe_upload_report(
+            client,
+            lookback_days=lookback,
+            project_id=project,
+            upload_token=token,
+            api_base=pump_base,
+            report_file=report_file,
+            csv_dir=csv_dir,
+            usage=result.usage,
+        )
 
     if output != "json":
         console.print(f"[dim]Scan complete in {elapsed:.2f}s[/dim]")
@@ -249,7 +393,7 @@ def login(
         pump_login(api_base=api_base, app_base=app_base)
     except LoginError as exc:
         typer.echo(f"Login failed: {exc}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
 
 @app.command()
@@ -265,7 +409,7 @@ def status() -> None:
         creds = load_credentials()
     except LoginError as exc:
         typer.echo(str(exc), err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
     if creds is None:
         typer.echo("Not logged in. Run `openai-radar login`.")
         raise typer.Exit(code=1)

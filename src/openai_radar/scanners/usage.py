@@ -10,8 +10,10 @@ so a scan with only a project key still produces inventory and findings.
 
 from __future__ import annotations
 
+import csv
 import warnings
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from openai_radar.client import RadarError
@@ -122,6 +124,17 @@ class UsageScanner(Scanner):
             self.truncated = True
 
         return results
+
+
+def write_usage_csv(path: str | Path, rows: list[ModelUsage]) -> Path:
+    """Write token usage for the Pump ``inventory`` upload. Returns the path written."""
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=ModelUsage.csv_fields(), extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(row.csv_row() for row in rows)
+    return destination
 
 
 def _dt(value: Any) -> datetime | None:

@@ -31,6 +31,9 @@ _URLS_PATH = "/api/v1/estimate/radar/urls"
 # Roles the backend recognizes. Cost is billing; token usage is inventory.
 _ROLES = ("billing", "inventory")
 
+# exchange_token_for_url distinguishes which radar produced the CSV.
+_PROVIDER = "openai"
+
 _HTTP_TIMEOUT_SECONDS = 60
 
 
@@ -38,10 +41,10 @@ class UploadError(RuntimeError):
     """Raised when the token exchange or the S3 PUT fails."""
 
 
-def _exchange_token_for_url(api_base: str, token: str, role: str) -> str:
+def _exchange_token_for_url(api_base: str, token: str, role: str, provider: str = _PROVIDER) -> str:
     """Exchange the upload token for a presigned PUT URL for *role*'s object."""
     url = api_base.rstrip("/") + _URLS_PATH
-    body = json.dumps({"token": token, "role": role}).encode("utf-8")
+    body = json.dumps({"token": token, "role": role, "provider": provider}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,
@@ -115,7 +118,7 @@ def upload_csvs(api_base: str, token: str, files: dict[str, str]) -> None:
         if not csv_path:
             continue
         print(f"  • {role}: requesting upload URL …")
-        upload_url = _exchange_token_for_url(api_base, token, role)
+        upload_url = _exchange_token_for_url(api_base, token, role, _PROVIDER)
         print(f"  • {role}: uploading {csv_path} …")
         _put_csv(upload_url, csv_path)
         print(f"  ✓ {role} uploaded")

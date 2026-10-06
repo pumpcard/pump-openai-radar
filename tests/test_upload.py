@@ -53,8 +53,16 @@ def test_upload_csvs_exchanges_then_puts(monkeypatch: pytest.MonkeyPatch, tmp_pa
     puts = [c for c in calls if c.method == "PUT"]
     assert len(posts) == 2 and len(puts) == 2
     assert posts[0].full_url == "http://localhost:8001/api/v1/estimate/radar/urls"
-    assert json.loads(posts[0].data.decode()) == {"token": "tok", "role": "billing"}
-    assert json.loads(posts[1].data.decode()) == {"token": "tok", "role": "inventory"}
+    assert json.loads(posts[0].data.decode()) == {
+        "token": "tok",
+        "role": "billing",
+        "provider": "openai",
+    }
+    assert json.loads(posts[1].data.decode()) == {
+        "token": "tok",
+        "role": "inventory",
+        "provider": "openai",
+    }
     assert puts[0].full_url == "https://s3/billing"
     assert puts[1].full_url == "https://s3/inventory"
     assert puts[0].headers["Content-type"] == "text/csv"

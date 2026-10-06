@@ -162,9 +162,9 @@ PUMP_API_BASE=http://localhost:8001 openai-radar run --admin-key sk-admin-... --
 ```
 
 `openai_radar/upload.py` posts `{api_base}/api/v1/estimate/radar/urls` once per
-file, with `{"token", "role": "billing"}` for costs and
-`{"token", "role": "inventory"}` for usage, then `PUT`s each CSV as
-`Content-Type: text/csv` (the presigned URL signs that content type).
+file, with `{"token", "role", "provider": "openai"}`. Costs use role `billing`
+and usage uses role `inventory`. Each CSV is then `PUT` as `Content-Type: text/csv`
+(the presigned URL signs that content type).
 
 ---
 

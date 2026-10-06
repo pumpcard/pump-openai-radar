@@ -30,11 +30,13 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import parse_qs, urlencode, urlsplit
 
+from openai_radar import __version__
+
 CLIENT_ID = "openai-radar"
 SCOPE = "radar"
 DEFAULT_API_BASE = "https://api.pump.co"
 DEFAULT_APP_BASE = "https://app.pump.co"
-USER_AGENT = "openai-radar/2.1.0"
+USER_AGENT = f"openai-radar/{__version__}"
 LOGIN_TIMEOUT_SECONDS = 180
 
 
@@ -263,6 +265,20 @@ def load_credentials(path: Path | None = None) -> PumpCredentials | None:
         scope=str(payload.get("scope") or SCOPE),
         api_base=str(payload.get("api_base") or DEFAULT_API_BASE),
     )
+
+
+def token_is_expired(creds: PumpCredentials, *, now: datetime | None = None) -> bool:
+    """True when the stored login can no longer authorize an upload."""
+    if not creds.expires_at:
+        return False
+    try:
+        expires = datetime.fromisoformat(creds.expires_at)
+    except ValueError:
+        return True
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    return current >= expires
 
 
 def clear_credentials(path: Path | None = None) -> bool:

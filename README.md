@@ -87,11 +87,11 @@ openai-radar findings
 # Scope to a project, 7-day lookback
 openai-radar run --project proj_xxx --lookback 7
 
-# Push the org cost report to Pump (admin key required)
-openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
-
-# Log in to Pump, check the stored token, or forget it
+# Log in to Pump, then push the org cost report (admin key required)
 openai-radar login
+openai-radar run --admin-key sk-admin-... --upload
+
+# Check or forget the stored Pump token
 openai-radar status
 openai-radar logout
 
@@ -101,8 +101,10 @@ openai-radar version
 
 Flags follow the Radar suite convention: `--output/-o` selects `table` or `json`,
 `--out-file` writes the JSON payload, `--csv-dir` writes per-resource CSVs.
-`--upload-token` also writes `report.csv` and uploads it. `--report-file` chooses
-that path; with `--csv-dir` and no `--report-file` it is `{csv-dir}/report.csv`.
+`--upload` writes `report.csv` and pushes it with the token from `openai-radar login`.
+`--upload-token` does the same with a one-shot token and overrides the stored login.
+`--report-file` chooses the path; with `--csv-dir` and no `--report-file` it is
+`{csv-dir}/report.csv`.
 
 ---
 
@@ -110,19 +112,30 @@ that path; with `--csv-dir` and no `--report-file` it is `{csv-dir}/report.csv`.
 
 The token is exchanged for a presigned S3 URL, and only the CSV leaves the machine.
 
-1. In the Pump app, mint an upload token (`POST /api/v1/estimate/radar/mint`). Pump
-   shows a ready-to-paste command.
-2. Run it with an OpenAI admin key:
+1. Log in. This runs the browser OAuth flow and stores an upload token locally:
 
    ```bash
-   openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+   openai-radar login
+   ```
+
+2. Scan and upload with an OpenAI admin key:
+
+   ```bash
+   openai-radar run --admin-key sk-admin-... --upload
    ```
 
    This scans the org, pulls daily costs from `/organization/costs`, writes
-   `report.csv`, and uploads that file. `--csv-dir` and `--drawio-file` still
-   work on the same command. Pass `--report-file` to choose where the CSV is written.
-
+   `report.csv`, and uploads that file with the stored token. `--csv-dir` and
+   `--drawio-file` still work on the same command. Pass `--report-file` to choose
+   where the CSV is written.
 3. Pump detects `report.csv` and runs its analysis.
+
+`openai-radar status` shows whether a token is stored (not the token itself).
+`openai-radar logout` deletes it. A one-shot token still works without logging in:
+
+```bash
+openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+```
 
 `report.csv` columns:
 
@@ -135,7 +148,9 @@ The token is exchanged for a presigned S3 URL, and only the CSV leaves the machi
 | Currency  | e.g. `USD`                                |
 
 Zero-cost buckets are omitted. The token carries no company id — Pump binds the
-company and the S3 key server-side. The exchange defaults to `https://api.pump.co`:
+company and the S3 key server-side. Login stores the API origin it used, and
+`run --upload` sends the report there. Override it with `--api-base` or
+`PUMP_API_BASE` (default `https://api.pump.co`):
 
 ```bash
 openai-radar run --admin-key sk-admin-... --upload-token <TOKEN> --api-base http://localhost:8001
@@ -220,6 +235,7 @@ src/openai_radar/
 ├── models/base.py       # Pydantic v2 models for all resource types
 ├── scanners/            # One scanner per resource type
 ├── exporters/           # CSV + draw.io exporters
+├── pump_login.py        # `login` / `logout` / `status` (OAuth + PKCE)
 ├── report.py            # organization cost report.csv
 ├── upload.py            # Pump presigned-URL upload (role: report)
 ├── agents/              # openai-agents tools + build_radar_agent()
@@ -255,6 +271,7 @@ From this checkout:
 ./openai-radar login
 ./openai-radar status
 ./openai-radar logout
+./openai-radar run --upload
 ./openai-radar version
 ```
 
@@ -263,7 +280,8 @@ From this checkout:
 `~/.config/openai-radar/credentials.json` when `XDG_CONFIG_HOME` is unset.
 `OPENAI_RADAR_CONFIG_DIR` overrides that directory. `PUMP_API_BASE` and
 `PUMP_APP_BASE` override the Pump origins, as do `--api-base` and `--app-base`.
-Scans still read `OPENAI_API_KEY` and, for org-wide usage, `OPENAI_ADMIN_KEY`.
+`run --upload` sends `report.csv` with the stored token. Scans still read
+`OPENAI_API_KEY` and, for org-wide usage, `OPENAI_ADMIN_KEY`.
 
 Login tests talk to a local fake Pump:
 

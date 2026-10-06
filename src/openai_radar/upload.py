@@ -1,8 +1,8 @@
 """
 Push a report CSV to Pump's self-serve onboarding endpoint.
 
-Same exchange as pump-aws-radar (``POST /api/v1/estimate/radar/urls``): a Pump
-user mints a short-lived upload token in the app, this module trades it for a
+Same exchange as pump-aws-radar (``POST /api/v1/estimate/radar/urls``): the
+token from ``openai-radar login`` (or ``--upload-token``) is traded for a
 presigned S3 PUT URL, and the report CSV is uploaded directly. The token
 carries no company id — the backend pins the company and derives the S3 key
 server-side, so the token can only write its own upload's prefix.

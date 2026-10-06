@@ -402,6 +402,178 @@ def test_findings_command_prints_json(monkeypatch: pytest.MonkeyPatch) -> None:
     assert payload[0]["severity"] == "medium"
 
 
+def _save_login(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    token: str = "stored-token",
+    api_base: str = "http://login.example",
+    expires_at: str | None = None,
+) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from openai_radar.pump_login import PumpCredentials, save_credentials
+
+    monkeypatch.setenv("OPENAI_RADAR_CONFIG_DIR", str(tmp_path))
+    if expires_at is None:
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    save_credentials(
+        PumpCredentials(
+            access_token=token,
+            token_type="Bearer",
+            expires_at=expires_at,
+            upload_id="upload-9",
+            scope="radar",
+            api_base=api_base,
+        ),
+        tmp_path / "credentials.json",
+    )
+
+
+def _patch_cost_report(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    seen: dict[str, object] = {}
+
+    async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
+        from openai_radar.report import CostReport
+
+        return CostReport(
+            rows=[
+                {
+                    "Date": "2026-01-01",
+                    "ProjectID": "proj",
+                    "LineItem": "gpt-4o",
+                    "Amount": "1.000000",
+                    "Currency": "USD",
+                }
+            ]
+        )
+
+    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+        seen["api_base"] = api_base
+        seen["token"] = token
+        seen["files"] = files
+
+    monkeypatch.setattr("openai_radar.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
+    return seen
+
+
+def test_run_upload_uses_the_login_token(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    _save_login(tmp_path, monkeypatch)
+    seen = _patch_cost_report(monkeypatch)
+    report_path = tmp_path / "report.csv"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--api-key",
+            "sk-test",
+            "--admin-key",
+            "sk-admin",
+            "--upload",
+            "--report-file",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert seen["token"] == "stored-token"
+    assert seen["api_base"] == "http://login.example"
+    assert seen["files"] == {"report": str(report_path)}
+    assert "stored-token" not in result.stdout
+
+
+def test_run_upload_token_overrides_the_stored_login(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    _save_login(tmp_path, monkeypatch)
+    seen = _patch_cost_report(monkeypatch)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--api-key",
+            "sk-test",
+            "--admin-key",
+            "sk-admin",
+            "--upload",
+            "--upload-token",
+            "one-shot",
+            "--api-base",
+            "http://override.example",
+            "--report-file",
+            str(tmp_path / "report.csv"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert seen["token"] == "one-shot"
+    assert seen["api_base"] == "http://override.example"
+
+
+def test_run_upload_without_login_stops_before_the_scan(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    seen = _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    monkeypatch.setenv("OPENAI_RADAR_CONFIG_DIR", str(tmp_path))
+
+    result = runner.invoke(app, ["run", "--api-key", "sk-test", "--upload"])
+
+    assert result.exit_code == 1
+    assert "openai-radar login" in result.stdout
+    assert seen == []
+
+
+def test_run_upload_rejects_an_expired_login(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    seen = _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    expired = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    _save_login(tmp_path, monkeypatch, expires_at=expired)
+
+    result = runner.invoke(app, ["run", "--api-key", "sk-test", "--upload"])
+
+    assert result.exit_code == 1
+    assert "expired" in result.stdout.lower()
+    assert seen == []
+
+
+def test_status_and_logout_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.setenv("OPENAI_RADAR_CONFIG_DIR", str(tmp_path))
+
+    missing = runner.invoke(app, ["status"])
+    assert missing.exit_code == 1
+    assert "Not logged in" in missing.stdout
+
+    _save_login(tmp_path, monkeypatch, token="secret-token", api_base="http://login.example")
+    present = runner.invoke(app, ["status"])
+    assert present.exit_code == 0, present.stdout
+    assert "http://login.example" in present.stdout
+    assert "upload-9" in present.stdout
+    assert "secret-token" not in present.stdout
+
+    gone = runner.invoke(app, ["logout"])
+    assert gone.exit_code == 0
+    assert "Logged out" in gone.stdout
+    assert runner.invoke(app, ["status"]).exit_code == 1
+
+
+def test_login_command_reports_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    from openai_radar.pump_login import LoginError
+
+    def boom(**kwargs: object) -> None:
+        raise LoginError("browser denied")
+
+    monkeypatch.setattr("openai_radar.cli.pump_login", boom)
+    result = runner.invoke(app, ["login"])
+    assert result.exit_code == 1
+    assert "browser denied" in result.stdout + result.stderr
+
+
 def test_findings_command_reports_scan_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_run(client: object, config: RunConfig) -> Any:
         raise RadarError("down")

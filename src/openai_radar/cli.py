@@ -6,6 +6,7 @@ import asyncio
 import json
 import sys
 import time
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -128,6 +129,55 @@ def _render_findings(findings: list[Finding]) -> None:
     console.print(f"\n{summary}\n")
 
 
+def _report_destination(report_file: str | None, csv_dir: str | None) -> Path:
+    if report_file:
+        return Path(report_file)
+    if csv_dir:
+        return Path(csv_dir) / "report.csv"
+    return Path("report.csv")
+
+
+def _write_and_maybe_upload_report(
+    client: RadarClient,
+    *,
+    lookback_days: int,
+    project_id: str | None,
+    upload_token: str | None,
+    api_base: str,
+    report_file: str | None,
+    csv_dir: str | None,
+) -> None:
+    """Build report.csv from org costs and, when a token is set, PUT it to Pump."""
+    from openai_radar.report import ReportError, fetch_cost_report, write_report_csv
+    from openai_radar.upload import UploadError, upload_csvs
+
+    destination = _report_destination(report_file, csv_dir)
+    try:
+        report = asyncio.run(
+            fetch_cost_report(client, lookback_days=lookback_days, project_id=project_id)
+        )
+    except (ReportError, RadarError) as exc:
+        console.print(f"[bold red]Report failed:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if report.truncated:
+        console.print("[yellow]Cost report may be incomplete.[/yellow]")
+
+    written = write_report_csv(destination, report.rows)
+    console.print(f"[green]Wrote[/green] {written}")
+
+    if not upload_token:
+        return
+
+    console.print(f"Uploading report.csv to Pump ({api_base})")
+    try:
+        upload_csvs(api_base=api_base, token=upload_token, files={"report": str(written)})
+    except UploadError as exc:
+        console.print(f"[bold red]Upload failed:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print("[green]Your OpenAI cost report is on its way to Pump.[/green]")
+
+
 def _payload(result: RunResult) -> dict:
     return {
         "assistants": [a.model_dump(mode="json") for a in result.assistants],
@@ -155,6 +205,22 @@ def run(
     csv_dir: str | None = typer.Option(None, "--csv-dir", help="Write per-resource CSVs here."),
     drawio_file: str | None = typer.Option(
         None, "--drawio-file", help="Write a draw.io architecture diagram here."
+    ),
+    upload_token: str | None = typer.Option(
+        None,
+        "--upload-token",
+        help="Pump upload token. Writes report.csv and pushes it to Pump onboarding.",
+    ),
+    api_base: str = typer.Option(
+        "https://api.pump.co",
+        "--api-base",
+        envvar="PUMP_API_BASE",
+        help="Pump API base for --upload-token.",
+    ),
+    report_file: str | None = typer.Option(
+        None,
+        "--report-file",
+        help="Write the cost report CSV here. Implied by --upload-token (default: report.csv).",
     ),
 ) -> None:
     """Scan an OpenAI organization."""
@@ -196,6 +262,17 @@ def run(
 
     if drawio_file:
         console.print(f"[green]Wrote[/green] {result.export_drawio(drawio_file)}")
+
+    if upload_token or report_file:
+        _write_and_maybe_upload_report(
+            client,
+            lookback_days=lookback,
+            project_id=project,
+            upload_token=upload_token,
+            api_base=api_base,
+            report_file=report_file,
+            csv_dir=csv_dir,
+        )
 
     if output != "json":
         console.print(f"[dim]Scan complete in {elapsed:.2f}s[/dim]")

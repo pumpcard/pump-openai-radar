@@ -87,12 +87,60 @@ openai-radar findings
 # Scope to a project, 7-day lookback
 openai-radar run --project proj_xxx --lookback 7
 
+# Push the org cost report to Pump (admin key required)
+openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+
 # Print the version
 openai-radar version
 ```
 
 Flags follow the Radar suite convention: `--output/-o` selects `table` or `json`,
 `--out-file` writes the JSON payload, `--csv-dir` writes per-resource CSVs.
+`--upload-token` also writes `report.csv` and uploads it. `--report-file` chooses
+that path; with `--csv-dir` and no `--report-file` it is `{csv-dir}/report.csv`.
+
+---
+
+## Pump onboarding
+
+Same push as [pump-aws-radar](https://github.com/pumpcard/pump-aws-radar): the token
+is exchanged for a presigned S3 URL, and only the CSV leaves the machine.
+
+1. In the Pump app, mint an upload token (`POST /api/v1/estimate/radar/mint`). Pump
+   shows a ready-to-paste command.
+2. Run it with an OpenAI admin key:
+
+   ```bash
+   openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+   ```
+
+   This scans the org, pulls daily costs from `/organization/costs`, writes
+   `report.csv`, and uploads that file. `--csv-dir` and `--drawio-file` still
+   work on the same command. Pass `--report-file` to choose where the CSV is written.
+3. Pump detects `report.csv` and runs its analysis.
+
+`report.csv` columns:
+
+| Column | Meaning |
+|--------|---------|
+| Date | UTC day (`YYYY-MM-DD`) |
+| ProjectID | OpenAI project, or `-` |
+| LineItem | Cost line item (model and token category) |
+| Amount | Non-zero cost, 6 decimal places |
+| Currency | e.g. `USD` |
+
+Zero-cost buckets are omitted. The token carries no company id — Pump binds the
+company and the S3 key server-side. The exchange defaults to `https://api.pump.co`:
+
+```bash
+openai-radar run --admin-key sk-admin-... --upload-token <TOKEN> --api-base http://localhost:8001
+# or
+PUMP_API_BASE=http://localhost:8001 openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+```
+
+`openai_radar/upload.py` posts `{api_base}/api/v1/estimate/radar/urls` with
+`{"token", "role": "report"}`, then `PUT`s the CSV as `Content-Type: text/csv`
+(the presigned URL signs that content type).
 
 ---
 
@@ -167,6 +215,8 @@ src/openai_radar/
 ├── models/base.py       # Pydantic v2 models for all resource types
 ├── scanners/            # One scanner per resource type
 ├── exporters/           # CSV + draw.io exporters
+├── report.py            # organization cost report.csv
+├── upload.py            # Pump presigned-URL upload (role: report)
 ├── agents/              # openai-agents tools + build_radar_agent()
 └── cli.py               # openai-radar CLI
 ```

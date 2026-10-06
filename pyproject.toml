@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openai-radar"
-version = "2.1.0"
+version = "2.2.0"
 description = "OpenAI infrastructure FinOps SDK — scan, analyze, and export your OpenAI org resources"
 readme = "README.md"
 license = { text = "MIT" }

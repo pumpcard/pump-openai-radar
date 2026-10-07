@@ -37,7 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Export formats — CSV and draw.io ship in the base install; these are kept as
-# no-op aliases so existing `openai-radar[csv]` / `[drawio]` pins keep resolving.
+# no-op aliases so existing `pump-openai-radar[csv]` / `[drawio]` pins keep resolving.
 csv = []
 drawio = []
 
@@ -45,7 +45,7 @@ drawio = []
 agents = ["openai-agents>=0.22.0"]        # run Radar as openai-agents tools
 
 # Full install
-all = ["openai-radar[agents]"]
+all = ["pump-openai-radar[agents]"]
 
 dev = ["pytest>=8.0"]
 
@@ -57,13 +57,13 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [project.urls]
-Homepage = "https://github.com/gomorsmi/openai-radar"
-Repository = "https://github.com/gomorsmi/openai-radar"
-"Bug Tracker" = "https://github.com/gomorsmi/openai-radar/issues"
-PyPI = "https://pypi.org/project/openai-radar/"
+Homepage = "https://github.com/pumpcard/pump-openai-radar"
+Repository = "https://github.com/pumpcard/pump-openai-radar"
+"Bug Tracker" = "https://github.com/pumpcard/pump-openai-radar/issues"
+PyPI = "https://pypi.org/project/pump-openai-radar/"
 
 [project.scripts]
-openai-radar = "openai_radar.cli:app"
+pump-openai-radar = "openai_radar.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/openai_radar"]

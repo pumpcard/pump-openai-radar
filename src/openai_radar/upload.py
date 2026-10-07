@@ -2,7 +2,7 @@
 Push onboarding CSVs to Pump's self-serve onboarding endpoint.
 
 Same exchange as pump-aws-radar (``POST /api/v1/estimate/radar/urls``): the
-token from ``openai-radar login`` (or ``--upload-token``) is traded for a
+token from ``pump-openai-radar login`` (or ``--upload-token``) is traded for a
 presigned S3 PUT URL, and each CSV is uploaded directly. The token carries no
 company id — the backend pins the company and derives the S3 key server-side,
 so the token can only write its own upload's prefix.
@@ -22,7 +22,7 @@ from openai_radar import __version__
 
 # A real User-Agent: Cloudflare in front of api.pump.co blocks the default
 # urllib agent ("Python-urllib/..."), so the token exchange must identify itself.
-_USER_AGENT = f"openai-radar/{__version__}"
+_USER_AGENT = f"pump-openai-radar/{__version__}"
 
 # The backend mounts its router under API_V1_STR (default "/api/v1"). The exchange
 # route is service/api/endpoints/estimate_radar.py :: exchange_token_for_url.

@@ -97,7 +97,7 @@ class LoginFlowTest(unittest.TestCase):
         self.base = f"http://127.0.0.1:{port}"
         self.config_dir = Path(self.id().replace(".", "_"))
         # Keep credentials out of the real home directory.
-        self._tmpdir = Path("/tmp") / "openai-radar-login-tests" / self.config_dir.name
+        self._tmpdir = Path("/tmp") / "pump-openai-radar-login-tests" / self.config_dir.name
         self._tmpdir.mkdir(parents=True, exist_ok=True)
         self.creds = self._tmpdir / "credentials.json"
 

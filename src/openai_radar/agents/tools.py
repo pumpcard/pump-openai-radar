@@ -3,7 +3,7 @@ Radar tools for the openai-agents SDK.
 
 Requires the ``agents`` extra::
 
-    pip install openai-radar[agents]
+    pip install pump-openai-radar[agents]
 
 Tools share a module-level cache so a conversation can scan once and then
 export or re-analyse without paying for a second pass over the API. Call
@@ -19,7 +19,7 @@ try:
     from agents import function_tool
 except ImportError as exc:  # pragma: no cover - depends on optional extra
     raise ImportError(
-        "openai-agents SDK not found. Install with: pip install openai-radar[agents]"
+        "openai-agents SDK not found. Install with: pip install pump-openai-radar[agents]"
     ) from exc
 
 from openai_radar.client import RadarClient

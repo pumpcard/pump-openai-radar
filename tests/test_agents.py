@@ -59,7 +59,7 @@ def test_tools_explain_the_missing_extra(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setitem(sys.modules, "agents", None)
     sys.modules.pop("openai_radar.agents.tools", None)
 
-    with pytest.raises(ImportError, match=r"openai-radar\[agents\]"):
+    with pytest.raises(ImportError, match=r"pump-openai-radar\[agents\]"):
         importlib.import_module("openai_radar.agents.tools")
 
 
@@ -67,7 +67,7 @@ def test_build_radar_agent_requires_the_extra(monkeypatch: pytest.MonkeyPatch) -
     _install_agents(monkeypatch, with_agent=False)
     from openai_radar.agents import build_radar_agent
 
-    with pytest.raises(ImportError, match=r"openai-radar\[agents\]"):
+    with pytest.raises(ImportError, match=r"pump-openai-radar\[agents\]"):
         build_radar_agent()
 
 

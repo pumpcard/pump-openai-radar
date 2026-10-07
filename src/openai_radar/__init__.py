@@ -1,4 +1,4 @@
-"""openai-radar: FinOps scanner for OpenAI infrastructure.
+"""pump-openai-radar: FinOps scanner for OpenAI infrastructure.
 
 Part of the Hyperscaler Radar suite.
 """

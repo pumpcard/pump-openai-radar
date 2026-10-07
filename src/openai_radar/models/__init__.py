@@ -1,4 +1,4 @@
-"""Resource models for openai-radar."""
+"""Resource models for pump-openai-radar."""
 
 from openai_radar.models.base import (
     AssistantInfo,

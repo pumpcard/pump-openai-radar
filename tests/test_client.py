@@ -98,7 +98,7 @@ def test_get_org_returns_json(monkeypatch: pytest.MonkeyPatch) -> None:
             "params": {"limit": 1},
             "headers": {
                 "Authorization": "Bearer sk-admin",
-                "User-Agent": "openai-radar",
+                "User-Agent": "pump-openai-radar",
             },
         }
     ]

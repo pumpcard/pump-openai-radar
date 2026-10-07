@@ -131,7 +131,7 @@ def test_drawio_export_places_nodes_and_edges(tmp_path) -> None:
     tree = etree.parse(str(path))
     root = tree.getroot()
     assert root.tag == "mxfile"
-    assert root.get("host") == "openai-radar"
+    assert root.get("host") == "pump-openai-radar"
 
     cells = list(root.iter("mxCell"))
     values = [cell.get("value") or "" for cell in cells]

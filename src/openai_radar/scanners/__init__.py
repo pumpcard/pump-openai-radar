@@ -1,4 +1,4 @@
-"""Resource scanners for openai-radar."""
+"""Resource scanners for pump-openai-radar."""
 
 from openai_radar.scanners.assistants import AssistantScanner, detect_relationships
 from openai_radar.scanners.base import Scanner

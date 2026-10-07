@@ -73,7 +73,7 @@ class DrawioExporter:
         if target.parent != Path(""):
             target.parent.mkdir(parents=True, exist_ok=True)
 
-        mxfile = etree.Element("mxfile", host="openai-radar", type="device")
+        mxfile = etree.Element("mxfile", host="pump-openai-radar", type="device")
         diagram = etree.SubElement(mxfile, "diagram", name="OpenAI Architecture", id="radar")
         model = etree.SubElement(
             diagram,

@@ -71,7 +71,7 @@ def test_upload_csvs_exchanges_then_puts(monkeypatch: pytest.MonkeyPatch, tmp_pa
     # Both requests send a real User-Agent (Cloudflare blocks the urllib default).
     assert posts[0].headers["User-agent"] == upload._USER_AGENT
     assert puts[0].headers["User-agent"] == upload._USER_AGENT
-    assert upload._USER_AGENT.startswith("openai-radar/")
+    assert upload._USER_AGENT.startswith("pump-openai-radar/")
 
 
 def test_expired_token_raises_clear_error(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

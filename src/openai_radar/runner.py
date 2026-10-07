@@ -92,7 +92,7 @@ class RunResult:
 
     def summary(self) -> str:
         lines = [
-            "openai-radar scan summary",
+            "pump-openai-radar scan summary",
             "─" * 40,
             f"  Assistants:    {len(self.assistants)}",
             f"  Vector stores: {len(self.vector_stores)}",

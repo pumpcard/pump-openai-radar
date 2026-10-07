@@ -1,9 +1,9 @@
-# openai-radar
+# pump-openai-radar
 
 **OpenAI infrastructure FinOps SDK** — part of the [Hyperscaler Radar](https://github.com/gomorsmi) suite.
 
-[![PyPI](https://img.shields.io/pypi/v/openai-radar)](https://pypi.org/project/openai-radar/)
-[![Python](https://img.shields.io/pypi/pyversions/openai-radar)](https://pypi.org/project/openai-radar/)
+[![PyPI](https://img.shields.io/pypi/v/pump-openai-radar)](https://pypi.org/project/pump-openai-radar/)
+[![Python](https://img.shields.io/pypi/pyversions/pump-openai-radar)](https://pypi.org/project/pump-openai-radar/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Scan your OpenAI org for assistants, vector stores, fine-tunes, batch jobs, and token usage.
@@ -16,9 +16,9 @@ that mirrors the `openai-agents` Runner API.
 ## Install
 
 ```bash
-pip install openai-radar                   # SDK + CLI + CSV and draw.io export
-pip install openai-radar[agents]           # + openai-agents integration
-pip install openai-radar[all]              # everything
+pip install pump-openai-radar                   # SDK + CLI + CSV and draw.io export
+pip install pump-openai-radar[agents]           # + openai-agents integration
+pip install pump-openai-radar[all]              # everything
 ```
 
 Requires Python 3.10+.
@@ -70,39 +70,39 @@ result = Runner.run_sync(client, config)
 
 ```bash
 # Full scan — findings table to stdout
-openai-radar run
+pump-openai-radar run
 
 # CSVs + draw.io diagram
-openai-radar run --csv-dir ./out --drawio-file arch.drawio
+pump-openai-radar run --csv-dir ./out --drawio-file arch.drawio
 
 # JSON instead of a table
-openai-radar run --output json --out-file scan.json
+pump-openai-radar run --output json --out-file scan.json
 
 # Admin key for org-wide usage data
-openai-radar run --admin-key sk-admin-... --csv-dir ./out
+pump-openai-radar run --admin-key sk-admin-... --csv-dir ./out
 
 # Findings only
-openai-radar findings
+pump-openai-radar findings
 
 # Scope to a project, 7-day lookback
-openai-radar run --project proj_xxx --lookback 7
+pump-openai-radar run --project proj_xxx --lookback 7
 
 # Log in to Pump, then push the org cost report (admin key required)
-openai-radar login
-openai-radar run --admin-key sk-admin-... --upload
+pump-openai-radar login
+pump-openai-radar run --admin-key sk-admin-... --upload
 
 # Check or forget the stored Pump token
-openai-radar status
-openai-radar logout
+pump-openai-radar status
+pump-openai-radar logout
 
 # Print the version
-openai-radar version
+pump-openai-radar version
 ```
 
 Flags follow the Radar suite convention: `--output/-o` selects `table` or `json`,
 `--out-file` writes the JSON payload, `--csv-dir` writes per-resource CSVs.
 `--upload` writes `report.csv` (costs) and `usage.csv` (token usage) and pushes
-them with the token from `openai-radar login`. Costs upload as role `billing`;
+them with the token from `pump-openai-radar login`. Costs upload as role `billing`;
 usage uploads as role `inventory`. `--upload-token` does the same with a one-shot
 token and overrides the stored login. `--report-file` chooses the cost CSV path;
 with `--csv-dir` and no `--report-file` it is `{csv-dir}/report.csv`. `usage.csv`
@@ -117,13 +117,13 @@ The token is exchanged for a presigned S3 URL, and only the cost and usage CSVs 
 1. Log in. This runs the browser OAuth flow and stores an upload token locally:
 
    ```bash
-   openai-radar login
+   pump-openai-radar login
    ```
 
 2. Scan and upload with an OpenAI admin key:
 
    ```bash
-   openai-radar run --admin-key sk-admin-... --upload
+   pump-openai-radar run --admin-key sk-admin-... --upload
    ```
 
    This scans the org, pulls daily costs from `/organization/costs`, writes
@@ -133,11 +133,11 @@ The token is exchanged for a presigned S3 URL, and only the cost and usage CSVs 
    CSV is written.
 3. Pump detects the upload and runs its analysis.
 
-`openai-radar status` shows whether a token is stored (not the token itself).
-`openai-radar logout` deletes it. A one-shot token still works without logging in:
+`pump-openai-radar status` shows whether a token is stored (not the token itself).
+`pump-openai-radar logout` deletes it. A one-shot token still works without logging in:
 
 ```bash
-openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+pump-openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
 ```
 
 `report.csv` columns:
@@ -156,9 +156,9 @@ company and the S3 key server-side. Login stores the API origin it used, and
 `PUMP_API_BASE` (default `https://api.pump.co`):
 
 ```bash
-openai-radar run --admin-key sk-admin-... --upload-token <TOKEN> --api-base http://localhost:8001
+pump-openai-radar run --admin-key sk-admin-... --upload-token <TOKEN> --api-base http://localhost:8001
 # or
-PUMP_API_BASE=http://localhost:8001 openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
+PUMP_API_BASE=http://localhost:8001 pump-openai-radar run --admin-key sk-admin-... --upload-token <TOKEN>
 ```
 
 `openai_radar/upload.py` posts `{api_base}/api/v1/estimate/radar/urls` once per
@@ -171,7 +171,7 @@ and usage uses role `inventory`. Each CSV is then `PUT` as `Content-Type: text/c
 ## openai-agents integration
 
 ```bash
-pip install openai-radar[agents]
+pip install pump-openai-radar[agents]
 ```
 
 ```python
@@ -242,7 +242,7 @@ src/openai_radar/
 ├── pump_login.py        # `login` / `logout` / `status` (OAuth + PKCE)
 ├── upload.py            # Pump presigned-URL upload (billing + inventory)
 ├── agents/              # openai-agents tools + build_radar_agent()
-└── cli.py               # openai-radar CLI
+└── cli.py               # pump-openai-radar CLI
 ```
 
 ---
@@ -270,17 +270,17 @@ The package lives in `src/openai_radar`, including `cli.py` and `pump_login.py`.
 From this checkout:
 
 ```bash
-./openai-radar --help
-./openai-radar login
-./openai-radar status
-./openai-radar logout
-./openai-radar run --upload
-./openai-radar version
+./pump-openai-radar --help
+./pump-openai-radar login
+./pump-openai-radar status
+./pump-openai-radar logout
+./pump-openai-radar run --upload
+./pump-openai-radar version
 ```
 
 `login` opens a browser for the Pump OAuth flow and writes the token to
-`$XDG_CONFIG_HOME/openai-radar/credentials.json`, or
-`~/.config/openai-radar/credentials.json` when `XDG_CONFIG_HOME` is unset.
+`$XDG_CONFIG_HOME/pump-openai-radar/credentials.json`, or
+`~/.config/pump-openai-radar/credentials.json` when `XDG_CONFIG_HOME` is unset.
 `OPENAI_RADAR_CONFIG_DIR` overrides that directory. `PUMP_API_BASE` and
 `PUMP_APP_BASE` override the Pump origins, as do `--api-base` and `--app-base`.
 `run --upload` sends `report.csv` with the stored token. Scans still read
@@ -296,4 +296,4 @@ python -m unittest tests.test_pump_login
 
 ## Part of the Hyperscaler Radar suite
 
-`aws-radar` · `gcp-radar` · `azure-radar` · `oci-radar` · `openai-radar` ·`claude-radar` · `gemini-radar` · `datadog-radar`
+`aws-radar` · `gcp-radar` · `azure-radar` · `oci-radar` · `pump-openai-radar` ·`claude-radar` · `gemini-radar` · `datadog-radar`

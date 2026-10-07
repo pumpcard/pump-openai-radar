@@ -216,6 +216,58 @@ def test_run_uploads_the_cost_report(monkeypatch: pytest.MonkeyPatch, tmp_path) 
     assert "on its way to Pump" in result.stdout
 
 
+def test_run_uploads_an_empty_usage_file(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    report_path = tmp_path / "report.csv"
+    seen: dict[str, object] = {}
+
+    async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
+        from openai_radar.scanners.report import CostReport
+
+        return CostReport(
+            rows=[
+                {
+                    "Date": "2026-01-01",
+                    "ProjectID": "proj",
+                    "LineItem": "gpt-4o",
+                    "Amount": "1.000000",
+                    "Currency": "USD",
+                }
+            ]
+        )
+
+    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+        seen["files"] = files
+
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--api-key",
+            "sk-test",
+            "--admin-key",
+            "sk-admin",
+            "--upload-token",
+            "tok",
+            "--report-file",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    usage_path = report_path.with_name("usage.csv")
+    assert seen["files"] == {"billing": str(report_path), "inventory": str(usage_path)}
+    assert usage_path.is_file()
+    usage_text = usage_path.read_text(encoding="utf-8")
+    assert usage_text.startswith("model,")
+    assert "gpt-4o" not in usage_text
+    assert "empty inventory file" in result.stdout
+    assert "on its way to Pump" in result.stdout
+
+
 def test_run_can_write_the_report_without_uploading(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:

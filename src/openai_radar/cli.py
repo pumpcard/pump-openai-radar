@@ -198,6 +198,8 @@ def _write_and_maybe_upload_report(
     """Write the cost report and usage CSV, and PUT them to Pump when a token is set.
 
     Costs upload as role ``billing``. Usage uploads as role ``inventory``.
+    An empty usage list still writes and uploads a header-only inventory file,
+    so Pump can tell the scan finished with no usage rows.
     """
     from openai_radar.scanners.report import ReportError, fetch_cost_report, write_report_csv
     from openai_radar.scanners.usage import write_usage_csv
@@ -218,16 +220,17 @@ def _write_and_maybe_upload_report(
     written = write_report_csv(destination, report.rows)
     console.print(f"[green]Wrote[/green] {written}")
 
-    files = {"billing": str(written)}
-    if usage:
-        usage_path = write_usage_csv(destination.with_name("usage.csv"), usage)
-        console.print(f"[green]Wrote[/green] {usage_path}")
-        files["inventory"] = str(usage_path)
-    elif upload_token:
-        console.print("[yellow]No usage rows to upload as inventory.[/yellow]")
+    # Always upload inventory, including a header-only file when the scan
+    # found no usage. Pump starts analysis only after both objects exist.
+    usage_path = write_usage_csv(destination.with_name("usage.csv"), usage)
+    console.print(f"[green]Wrote[/green] {usage_path}")
+    files = {"billing": str(written), "inventory": str(usage_path)}
 
     if not upload_token:
         return
+
+    if not usage:
+        console.print("[yellow]No usage rows; uploading an empty inventory file.[/yellow]")
 
     console.print(f"Uploading to Pump ({api_base})")
     try:

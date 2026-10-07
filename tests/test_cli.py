@@ -33,7 +33,7 @@ def _patch_run(monkeypatch: pytest.MonkeyPatch, result: RunResult | Exception) -
 def test_version() -> None:
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "openai-radar 0.0.1" in result.stdout
+    assert "pump-openai-radar 0.0.1" in result.stdout
 
 
 def test_run_rejects_an_unknown_output() -> None:
@@ -553,7 +553,7 @@ def test_run_upload_without_login_stops_before_the_scan(
     result = runner.invoke(app, ["run", "--api-key", "sk-test", "--upload"])
 
     assert result.exit_code == 1
-    assert "openai-radar login" in result.stdout
+    assert "pump-openai-radar login" in result.stdout
     assert seen == []
 
 

@@ -112,7 +112,7 @@ class RadarClient:
         url = f"{self.base_url.rstrip('/')}{path}"
         headers = {
             "Authorization": f"Bearer {self.admin_key}",
-            "User-Agent": "openai-radar",
+            "User-Agent": "pump-openai-radar",
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as http:

@@ -1,6 +1,6 @@
 """
 Pre-built Radar Agent for openai-agents SDK.
-Requires: pip install openai-radar[agents]
+Requires: pip install pump-openai-radar[agents]
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def build_radar_agent(model: str = "gpt-4o", name: str = "OpenAI Radar Agent"):
         from agents import Agent
     except ImportError as e:
         raise ImportError(
-            "openai-agents SDK not found. Install with: pip install openai-radar[agents]"
+            "openai-agents SDK not found. Install with: pip install pump-openai-radar[agents]"
         ) from e
 
     from openai_radar.agents.tools import (
@@ -48,7 +48,7 @@ def build_radar_agent(model: str = "gpt-4o", name: str = "OpenAI Radar Agent"):
         name=name,
         model=model,
         instructions="""
-You are an OpenAI infrastructure FinOps analyst powered by openai-radar.
+You are an OpenAI infrastructure FinOps analyst powered by pump-openai-radar.
 
 Your capabilities:
 - Scan assistants, vector stores, fine-tunes, batch jobs, and token usage

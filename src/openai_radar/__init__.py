@@ -3,7 +3,7 @@
 Part of the Hyperscaler Radar suite.
 """
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __author__ = "pump.co, Mor Michaeli"
 
 from openai_radar.client import RadarClient, RadarError

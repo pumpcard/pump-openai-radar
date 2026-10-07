@@ -138,7 +138,9 @@ class _CallbackServer(ThreadingHTTPServer):
 
 def _start_callback_server() -> tuple[_CallbackServer, threading.Thread]:
     server = _CallbackServer()
-    thread = threading.Thread(target=server.serve_forever, name="pump-openai-radar-login", daemon=True)
+    thread = threading.Thread(
+        target=server.serve_forever, name="pump-openai-radar-login", daemon=True
+    )
     thread.start()
     return server, thread
 
@@ -255,7 +257,9 @@ def load_credentials(path: Path | None = None) -> PumpCredentials | None:
         raise LoginError(f"Could not read {destination}: {exc}") from exc
     token = payload.get("access_token")
     if not isinstance(token, str) or not token:
-        raise LoginError(f"{destination} does not contain a token. Run `pump-openai-radar login` again.")
+        raise LoginError(
+            f"{destination} does not contain a token. Run `pump-openai-radar login` again."
+        )
     upload_id = payload.get("upload_id")
     return PumpCredentials(
         access_token=token,

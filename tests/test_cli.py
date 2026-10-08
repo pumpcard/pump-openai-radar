@@ -33,7 +33,7 @@ def _patch_run(monkeypatch: pytest.MonkeyPatch, result: RunResult | Exception) -
 def test_version() -> None:
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "pump-openai-radar 0.0.3" in result.stdout
+    assert "pump-openai-radar 0.0.4" in result.stdout
 
 
 def test_run_rejects_an_unknown_output() -> None:

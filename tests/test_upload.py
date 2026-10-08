@@ -103,3 +103,36 @@ def test_exchange_without_upload_url_raises(monkeypatch: pytest.MonkeyPatch, tmp
 def test_unknown_role_rejected(tmp_path) -> None:
     with pytest.raises(upload.UploadError, match="Unknown upload role"):
         upload.upload_csvs("http://x", "tok", {"report": "nope.csv"})
+
+
+def test_upload_csvs_reports_each_step(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    billing = tmp_path / "out" / "report.csv"
+    inventory = tmp_path / "out" / "usage.csv"
+    billing.parent.mkdir()
+    billing.write_text("costs\n")
+    inventory.write_text("usage\n")
+    messages: list[str] = []
+
+    def fake_urlopen(req, timeout=None):  # type: ignore[no-untyped-def]
+        if req.method == "POST":
+            role = json.loads(req.data.decode())["role"]
+            return _FakeResp(json.dumps({"upload_url": f"https://s3/{role}"}).encode())
+        return _FakeResp(status=200)
+
+    monkeypatch.setattr(upload.urllib.request, "urlopen", fake_urlopen)
+
+    upload.upload_csvs(
+        "http://localhost:8001",
+        "tok",
+        {"billing": str(billing), "inventory": str(inventory)},
+        log=messages.append,
+    )
+
+    assert messages == [
+        "  • billing: requesting upload URL …",
+        "  • billing: uploading report.csv …",
+        "  ✓ billing uploaded",
+        "  • inventory: requesting upload URL …",
+        "  • inventory: uploading usage.csv …",
+        "  ✓ inventory uploaded",
+    ]

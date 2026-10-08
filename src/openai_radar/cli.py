@@ -6,10 +6,14 @@ import asyncio
 import json
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
 from rich.table import Table
 
 from openai_radar import __version__
@@ -36,6 +40,37 @@ SEVERITY_STYLE = {
 }
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+
+
+def _stderr_is_tty() -> bool:
+    try:
+        return bool(sys.stderr.isatty())
+    except (AttributeError, ValueError):
+        return False
+
+
+@contextmanager
+def _loading(message: str) -> Iterator[None]:
+    """Show a loading notification while a call to an API is in flight.
+
+    A terminal gets a spinner. Pipes, logs, and tests get one line on stderr
+    so a JSON payload written to stdout stays parseable.
+    """
+    err = Console(stderr=True, highlight=False)
+    if not _stderr_is_tty():
+        err.print(message)
+        yield
+        return
+
+    with Live(
+        Spinner("dots", text=message),
+        console=err,
+        refresh_per_second=12.5,
+        transient=True,
+        redirect_stdout=False,
+        redirect_stderr=False,
+    ):
+        yield
 
 
 def _build_client(api_key: str | None, admin_key: str | None, project: str | None) -> RadarClient:
@@ -207,9 +242,10 @@ def _write_and_maybe_upload_report(
 
     destination = _report_destination(report_file, csv_dir)
     try:
-        report = asyncio.run(
-            fetch_cost_report(client, lookback_days=lookback_days, project_id=project_id)
-        )
+        with _loading("Waiting on the OpenAI costs API…"):
+            report = asyncio.run(
+                fetch_cost_report(client, lookback_days=lookback_days, project_id=project_id)
+            )
     except (ReportError, RadarError) as exc:
         console.print(f"[bold red]Report failed:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc
@@ -234,7 +270,8 @@ def _write_and_maybe_upload_report(
 
     console.print(f"Uploading to Pump ({api_base})")
     try:
-        upload_csvs(api_base=api_base, token=upload_token, files=files)
+        with _loading("Waiting on the Pump API…"):
+            upload_csvs(api_base=api_base, token=upload_token, files=files)
     except UploadError as exc:
         console.print(f"[bold red]Upload failed:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc
@@ -304,7 +341,8 @@ def run(
 
     started = time.time()
     try:
-        result = asyncio.run(Runner.run(client, config))
+        with _loading("Waiting on the OpenAI API…"):
+            result = asyncio.run(Runner.run(client, config))
     except RadarError as exc:
         console.print(f"[bold red]Scan failed:[/bold red] {exc}")
         raise typer.Exit(code=1)
@@ -365,7 +403,8 @@ def findings(
     config = RunConfig(project_id=project, usage_lookback_days=lookback)
 
     try:
-        result = asyncio.run(Runner.run(client, config))
+        with _loading("Waiting on the OpenAI API…"):
+            result = asyncio.run(Runner.run(client, config))
     except RadarError as exc:
         console.print(f"[bold red]Scan failed:[/bold red] {exc}")
         raise typer.Exit(code=1)

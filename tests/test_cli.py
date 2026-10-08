@@ -74,6 +74,8 @@ def test_run_json_includes_the_scan_payload(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
+    assert "Waiting on the OpenAI API" not in result.stdout
+    assert "Waiting on the OpenAI API" in result.stderr
     assert payload["assistants"][0]["id"] == "asst_1"
     assert payload["findings"] == []
     assert seen[0].project_id == "proj_x"
@@ -214,6 +216,9 @@ def test_run_uploads_the_cost_report(monkeypatch: pytest.MonkeyPatch, tmp_path) 
     assert "gpt-4o, input" in report_path.read_text(encoding="utf-8")
     assert "gpt-4o" in usage_path.read_text(encoding="utf-8")
     assert "on its way to Pump" in result.stdout
+    assert "Waiting on the OpenAI API" in result.stderr
+    assert "Waiting on the OpenAI costs API" in result.stderr
+    assert "Waiting on the Pump API" in result.stderr
 
 
 def test_run_uploads_an_empty_usage_file(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -472,6 +477,8 @@ def test_findings_command_prints_json(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = json.loads(result.stdout)
     assert payload[0]["rule_id"] == "FT_001"
     assert payload[0]["severity"] == "medium"
+    assert "Waiting on the OpenAI API" not in result.stdout
+    assert "Waiting on the OpenAI API" in result.stderr
 
 
 def _save_login(

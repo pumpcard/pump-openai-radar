@@ -6,7 +6,7 @@ import asyncio
 import json
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -50,27 +50,47 @@ def _stderr_is_tty() -> bool:
 
 
 @contextmanager
-def _loading(message: str) -> Iterator[None]:
+def _loading(message: str) -> Iterator[Callable[[str], None]]:
     """Show a loading notification while a call to an API is in flight.
 
-    A terminal gets a spinner. Pipes, logs, and tests get one line on stderr
-    so a JSON payload written to stdout stays parseable.
+    Yields a function that replaces the notification text. A terminal rewrites
+    one spinner line, and prints made during the call stay above that line
+    instead of running into it. Pipes, logs, and tests get one line on stderr
+    so a JSON payload written to stdout stays parseable; the yielded function
+    is a no-op there.
     """
     err = Console(stderr=True, highlight=False)
     if not _stderr_is_tty():
         err.print(message)
-        yield
+        yield lambda _text: None
         return
 
+    spinner = Spinner("dots", text=message)
+
+    def update(text: str) -> None:
+        spinner.update(text=text)
+
     with Live(
-        Spinner("dots", text=message),
+        spinner,
         console=err,
         refresh_per_second=12.5,
         transient=True,
-        redirect_stdout=False,
+        redirect_stdout=True,
         redirect_stderr=False,
     ):
-        yield
+        yield update
+
+
+def _show_upload_status(set_status: Callable[[str], None], message: str) -> None:
+    """Show one upload step without gluing it to the spinner.
+
+    In-progress lines replace the spinner text. A finished upload is printed
+    once and left in the scrollback. Pipes and logs print every line.
+    """
+    if _stderr_is_tty() and not message.startswith("  ✓"):
+        set_status(message.removeprefix("  • "))
+        return
+    print(message)
 
 
 def _build_client(api_key: str | None, admin_key: str | None, project: str | None) -> RadarClient:
@@ -270,8 +290,13 @@ def _write_and_maybe_upload_report(
 
     console.print(f"Uploading to Pump ({api_base})")
     try:
-        with _loading("Waiting on the Pump API…"):
-            upload_csvs(api_base=api_base, token=upload_token, files=files)
+        with _loading("Waiting on the Pump API…") as set_status:
+            upload_csvs(
+                api_base=api_base,
+                token=upload_token,
+                files=files,
+                log=lambda message: _show_upload_status(set_status, message),
+            )
     except UploadError as exc:
         console.print(f"[bold red]Upload failed:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc

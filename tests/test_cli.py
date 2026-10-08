@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import pty
+import re
+import select
+import subprocess
+import sys
+import time
 from typing import Any
 
 import pytest
@@ -177,7 +184,7 @@ def test_run_uploads_the_cost_report(monkeypatch: pytest.MonkeyPatch, tmp_path) 
             ]
         )
 
-    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+    def fake_upload(api_base: str, token: str, files: dict[str, str], log: object = None) -> None:
         seen["api_base"] = api_base
         seen["token"] = token
         seen["files"] = files
@@ -241,7 +248,7 @@ def test_run_uploads_an_empty_usage_file(monkeypatch: pytest.MonkeyPatch, tmp_pa
             ]
         )
 
-    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+    def fake_upload(api_base: str, token: str, files: dict[str, str], log: object = None) -> None:
         seen["files"] = files
 
     monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
@@ -346,7 +353,7 @@ def test_run_upload_defaults_the_report_into_csv_dir(
             ]
         )
 
-    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+    def fake_upload(api_base: str, token: str, files: dict[str, str], log: object = None) -> None:
         seen["files"] = files
 
     monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
@@ -414,7 +421,7 @@ def test_run_reports_upload_failure(monkeypatch: pytest.MonkeyPatch, tmp_path) -
             ]
         )
 
-    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+    def fake_upload(api_base: str, token: str, files: dict[str, str], log: object = None) -> None:
         from openai_radar.upload import UploadError
 
         raise UploadError("token was rejected")
@@ -527,7 +534,7 @@ def _patch_cost_report(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
             ]
         )
 
-    def fake_upload(api_base: str, token: str, files: dict[str, str]) -> None:
+    def fake_upload(api_base: str, token: str, files: dict[str, str], log: object = None) -> None:
         seen["api_base"] = api_base
         seen["token"] = token
         seen["files"] = files
@@ -660,6 +667,213 @@ def test_login_command_reports_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(app, ["login"])
     assert result.exit_code == 1
     assert "browser denied" in result.stdout + result.stderr
+
+
+def test_upload_progress_rewrites_the_spinner_on_a_tty(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from openai_radar.cli import _show_upload_status
+
+    monkeypatch.setattr("openai_radar.cli._stderr_is_tty", lambda: True)
+    seen: list[str] = []
+    _show_upload_status(seen.append, "  • billing: uploading report.csv …")
+    assert seen == ["billing: uploading report.csv …"]
+    assert capsys.readouterr().out == ""
+
+
+def test_upload_progress_keeps_finished_lines(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from openai_radar.cli import _show_upload_status
+
+    monkeypatch.setattr("openai_radar.cli._stderr_is_tty", lambda: True)
+    _show_upload_status(lambda _text: None, "  ✓ billing uploaded")
+    assert capsys.readouterr().out == "  ✓ billing uploaded\n"
+
+
+def test_upload_progress_prints_every_line_when_not_a_tty(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from openai_radar.cli import _show_upload_status
+
+    monkeypatch.setattr("openai_radar.cli._stderr_is_tty", lambda: False)
+
+    def fail(text: str) -> None:
+        raise AssertionError(text)
+
+    _show_upload_status(fail, "  • billing: requesting upload URL …")
+    assert capsys.readouterr().out == "  • billing: requesting upload URL …\n"
+
+
+def test_run_upload_steps_stay_on_their_own_lines(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    _patch_run(monkeypatch, RunResult(config=RunConfig()))
+    report_path = tmp_path / "report.csv"
+
+    async def fake_fetch(client: object, *, lookback_days: int, project_id: str | None) -> object:
+        from openai_radar.scanners.report import CostReport
+
+        return CostReport(
+            rows=[
+                {
+                    "Date": "2026-01-01",
+                    "ProjectID": "proj",
+                    "LineItem": "gpt-4o",
+                    "Amount": "1.000000",
+                    "Currency": "USD",
+                }
+            ]
+        )
+
+    def fake_upload(api_base: str, token: str, files: dict[str, str], log: object = None) -> None:
+        assert callable(log)
+        log("  • billing: requesting upload URL …")
+        log("  ✓ billing uploaded")
+        log("  • inventory: uploading usage.csv …")
+        log("  ✓ inventory uploaded")
+
+    monkeypatch.setattr("openai_radar.scanners.report.fetch_cost_report", fake_fetch)
+    monkeypatch.setattr("openai_radar.upload.upload_csvs", fake_upload)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--api-key",
+            "sk-test",
+            "--admin-key",
+            "sk-admin",
+            "--upload-token",
+            "tok",
+            "--api-base",
+            "http://localhost:8001",
+            "--report-file",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "  • billing: requesting upload URL …" in result.stdout
+    assert "  ✓ billing uploaded" in result.stdout
+    assert "  ✓ inventory uploaded" in result.stdout
+    assert "Waiting on the Pump API…  •" not in result.stdout
+    assert "Waiting on the Pump API…  •" not in result.stderr
+    assert "⠋" not in result.stdout
+    assert "Waiting on the Pump API" in result.stderr
+
+
+def _render_terminal(data: str) -> str:
+    """Apply the cursor controls Rich uses so a pty capture can be read as a screen."""
+    lines = [""]
+    row = 0
+    col = 0
+    index = 0
+    while index < len(data):
+        char = data[index]
+        if char == "\r":
+            col = 0
+            index += 1
+            continue
+        if char == "\n":
+            row += 1
+            col = 0
+            if row == len(lines):
+                lines.append("")
+            index += 1
+            continue
+        if char == "\x1b" and data.startswith("\x1b[", index):
+            match = re.match(r"\x1b\[(\??)([0-9;]*)([A-Za-z])", data[index:])
+            if match is None:
+                index += 1
+                continue
+            kind = match.group(3)
+            raw_count = match.group(2).split(";")[0] if match.group(2) else ""
+            count = int(raw_count) if raw_count else 1
+            index += match.end()
+            while len(lines) <= row:
+                lines.append("")
+            if kind == "K" and count == 2:
+                lines[row] = ""
+            elif kind == "K":
+                lines[row] = lines[row][:col]
+            elif kind == "A":
+                row = max(0, row - count)
+            continue
+        while len(lines) <= row:
+            lines.append("")
+        line = lines[row]
+        if col > len(line):
+            line += " " * (col - len(line))
+        lines[row] = line[:col] + char + line[col + 1 :]
+        col += 1
+        index += 1
+    return "\n".join(line.rstrip() for line in lines).strip()
+
+
+def test_upload_spinner_does_not_stick_to_progress_lines() -> None:
+    script = """
+import time
+from openai_radar.cli import _loading, _show_upload_status
+
+print("Uploading to Pump (http://localhost:8001)")
+with _loading("Waiting on the Pump API…") as set_status:
+    for message in [
+        "  • billing: requesting upload URL …",
+        "  • billing: uploading report.csv …",
+        "  ✓ billing uploaded",
+        "  • inventory: requesting upload URL …",
+        "  • inventory: uploading usage.csv …",
+        "  ✓ inventory uploaded",
+    ]:
+        _show_upload_status(set_status, message)
+        time.sleep(0.08)
+print("Your OpenAI cost and usage data is on its way to Pump.")
+"""
+    master, slave = pty.openpty()
+    env = os.environ.copy()
+    env["TERM"] = "xterm-256color"
+    env["COLUMNS"] = "100"
+    env["PYTHONPATH"] = os.pathsep.join(
+        [os.path.join(os.getcwd(), "src"), env.get("PYTHONPATH", "")]
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-c", script],
+        stdin=slave,
+        stdout=slave,
+        stderr=slave,
+        close_fds=True,
+        env=env,
+    )
+    os.close(slave)
+    chunks: list[bytes] = []
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        ready, _, _ = select.select([master], [], [], 0.2)
+        if ready:
+            try:
+                chunk = os.read(master, 16384)
+            except OSError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+        elif proc.poll() is not None:
+            break
+    proc.wait(timeout=3)
+    os.close(master)
+    raw = b"".join(chunks).decode("utf-8", "replace")
+    screen = _render_terminal(raw)
+
+    assert proc.returncode == 0, raw
+    assert "API…  •" not in raw
+    assert "API…  ✓" not in raw
+    assert screen == (
+        "Uploading to Pump (http://localhost:8001)\n"
+        "  ✓ billing uploaded\n"
+        "  ✓ inventory uploaded\n"
+        "Your OpenAI cost and usage data is on its way to Pump."
+    )
 
 
 def test_findings_command_reports_scan_errors(monkeypatch: pytest.MonkeyPatch) -> None:

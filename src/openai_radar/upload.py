@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Callable
+from pathlib import Path
 
 from openai_radar import __version__
 
@@ -101,24 +103,32 @@ def _put_csv(upload_url: str, csv_path: str) -> None:
         raise UploadError(f"S3 PUT of {csv_path} could not connect: {e.reason}") from e
 
 
-def upload_csvs(api_base: str, token: str, files: dict[str, str]) -> None:
+def upload_csvs(
+    api_base: str,
+    token: str,
+    files: dict[str, str],
+    log: Callable[[str], None] | None = None,
+) -> None:
     """Upload each role's CSV to Pump.
 
     :param api_base: Pump API base, e.g. https://api.pump.co (no trailing /api).
     :param token:    the --upload-token minted in the Pump app.
     :param files:    {role: local_csv_path}. ``billing`` is the cost CSV,
                      ``inventory`` is the usage CSV.
+    :param log:      progress callback. Defaults to printing each step.
     """
     unknown = set(files) - set(_ROLES)
     if unknown:
         raise UploadError(f"Unknown upload role(s): {sorted(unknown)}. Expected {list(_ROLES)}.")
 
+    emit = print if log is None else log
     for role in _ROLES:
         csv_path = files.get(role)
         if not csv_path:
             continue
-        print(f"  • {role}: requesting upload URL …")
+        filename = Path(csv_path).name
+        emit(f"  • {role}: requesting upload URL …")
         upload_url = _exchange_token_for_url(api_base, token, role, _PROVIDER)
-        print(f"  • {role}: uploading {csv_path} …")
+        emit(f"  • {role}: uploading {filename} …")
         _put_csv(upload_url, csv_path)
-        print(f"  ✓ {role} uploaded")
+        emit(f"  ✓ {role} uploaded")

@@ -133,6 +133,7 @@ class LoginFlowTest(unittest.TestCase):
         joined = "\n".join(lines)
         self.assertNotIn("upload-token", joined)
         self.assertIn("code_challenge_method=S256", joined)
+        self.assertIn("Waiting on the Pump API", joined)
 
     def test_state_mismatch_does_not_store_a_token(self) -> None:
         self.pump.tamper_state = True

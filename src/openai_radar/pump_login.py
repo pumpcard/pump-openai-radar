@@ -341,6 +341,7 @@ def login(
         if not code:
             raise LoginError("Login response did not include an authorization code.")
 
+        stdout("Waiting on the Pump API…")
         creds = exchange_code(
             api_base=api,
             code=code,
